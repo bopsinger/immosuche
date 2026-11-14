@@ -1,0 +1,55 @@
+# Konsolidierte Immobiliensuche: Suchkriterien
+# Nach jeder Änderung einfach committen; der nächste Tageslauf übernimmt sie.
+
+suche:
+  angebot: RENT              # RENT = mieten, SALE = kaufen
+  kategorien: [APARTMENT]    # APARTMENT, HOUSE (weitere Flatfox-Kategorien: SHARED, PARK, INDUSTRY, ...)
+
+  # Gesuchte Orte; Umkreis in Kilometern um das Ortszentrum
+  orte:
+    - name: Zürich
+      umkreis_km: 4
+    # - name: Winterthur
+    #   umkreis_km: 3
+
+  preis_min: null            # CHF (Miete: brutto pro Monat, sofern angegeben)
+  preis_max: 3000
+  zimmer_min: 3
+  zimmer_max: null
+  flaeche_min: null          # m² Wohnfläche
+  flaeche_max: null
+
+  # Optional: Inserat muss ALLE diese Merkmale haben
+  # (Flatfox-Kennungen, z.B. balconygarden, petsallowed, parkingspace, garage,
+  #  lift, dishwasher, washingmachine, view, wheelchairaccessible)
+  merkmale_pflicht: []
+
+  # Inserate mit einem dieser Begriffe in Titel/Beschreibung werden verworfen
+  ausschluss_woerter: [befristet, Untermiete, möbliert, WG-Zimmer, Mitbewohn, Zwischenmiete,
+                       temporary, temporär, furnished, sublet, "shared flat"]
+
+benachrichtigung:
+  betreff: "Immosuche: {anzahl} neue Treffer"
+  nur_bei_treffern: true     # false = auch eine Mail ohne Treffer senden
+  max_treffer_pro_mail: 60
+  # Empfänger stehen NICHT hier, sondern im GitHub-Secret MAIL_TO (kommagetrennt)
+
+quellen:
+  flatfox: true
+  # Suchabos von Homegate, ImmoScout24, Newhome, Comparis usw. an das
+  # Sammelpostfach (IMAP) senden lassen; sie werden hier ausgewertet.
+  postfach:
+    aktiv: true
+    ordner: INBOX
+    tage_zurueck: 3          # so weit zurück werden Portal-Mails gelesen
+    absender:                # Absender-Domains, deren Mails ausgewertet werden
+      - homegate.ch
+      - immoscout24.ch
+      - newhome.ch
+      - comparis.ch
+      - immostreet.ch
+      - realadvisor.ch
+      - tutti.ch
+      - anibis.ch
+      - immobilier.ch
+      - home.ch
