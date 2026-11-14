@@ -1,0 +1,17 @@
+# Gespeichert über die Immosuche-Karte am 14.11.2026.
+suche:
+  angebot: RENT
+  kategorien: ["APARTMENT"]
+  orte:
+    - name: "Ort Thalwil (ZH)"
+      lat: 47.291458
+      lon: 8.563276
+      umkreis_km: 5
+  preis_min: 1000
+  preis_max: 3000
+  zimmer_min: 2.5
+  zimmer_max: null
+  flaeche_min: 30
+  flaeche_max: null
+  merkmale_pflicht: []
+  ausschluss_woerter: ["befristet", "Untermiete", "möbliert", "WG-Zimmer", "Mitbewohn", "Zwischenmiete", "temporary", "temporär", "furnished", "sublet", "shared flat"]
