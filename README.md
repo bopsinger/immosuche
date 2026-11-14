@@ -38,17 +38,25 @@ ihren Nutzungsbedingungen. Ihre eigenen E-Mail-Suchabos sind der zulässige und 
 4. Unter *Actions → Tägliche Immobiliensuche → Run workflow* einmal manuell starten.
    Der erste Lauf meldet alle aktuell passenden Inserate, danach nur noch neue.
 
-## Kriterien ändern
+## Suchen verwalten
 
-Am einfachsten auf der Karte: Im Reiter *Wohnungen* einen Ort eintippen und «zur Suche hinzufügen»,
-oder im Reiter **Meine Suche** Gebiete und Eckdaten anpassen und **Suche speichern**. Beim ersten
-Speichern fragt die Karte einmalig nach einem GitHub-Zugangsschlüssel (nur dieses Repository,
+Alles auf der Karte (bopsinger.github.io/immosuche):
+
+- **Suchen** (Startseite): alle Suchen mit Gebiet, Kriterien, Empfängern und Anzahl Treffer;
+  **+ Neue Suche**, Bearbeiten, Pausieren, Löschen. Jede Suche hat eigene E-Mail-Empfänger
+  (ohne Eintrag gilt das Secret `MAIL_TO`).
+- **Wohnungen**: alle Treffer mit Fotos, filterbar nach Suche; Ortssuche mit «Suche anlegen».
+- **Quellen**: Status je Portal (verbunden, letzte Suchabo-Mail) mit Anleitung zum Einrichten.
+
+Beim ersten Speichern fragt die Karte einmalig nach einem GitHub-Zugangsschlüssel (nur dieses Repository,
 Contents: Read and write; er bleibt im Browser). Gespeichert wird in `suche.yaml`; das startet sofort
-einen Suchlauf, dessen Ergebnis die Karte direkt anzeigt. Alternativ `suche.yaml` oder `config.yaml`
-direkt bearbeiten.
+einen Suchlauf, dessen Ergebnis die Karte direkt anzeigt.
 
-Hinweis: Dieses Repository ist öffentlich; Suchkriterien und Kartendaten sind damit einsehbar
-(die Seite ist für Suchmaschinen gesperrt). Empfänger und Zugangsdaten liegen nur in den Secrets.
+**Datenschutz:** Das Repository ist öffentlich. E-Mail-Adressen werden deshalb im Browser mit dem
+öffentlichen Schlüssel `schluessel/oeffentlich.pem` verschlüsselt; nur der Suchlauf kann sie lesen
+(der private Schlüssel ist mit dem Secret `MAIL_PASSWORD` gesichert). Ändert sich dieses Passwort,
+entsteht ein neuer Schlüssel und die Empfänger müssen neu eingetragen werden. Suchkriterien und
+Kartendaten sind öffentlich einsehbar; die Seite ist für Suchmaschinen gesperrt.
 
 ## Lokal testen
 

@@ -5,24 +5,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>Immosuche Karte</title>
-<meta name="description" content="Aktuelle Wohnungsinserate aus mehreren Portalen auf der Karte">
+<meta name="description" content="Wohnungssuchen verwalten und Inserate aus mehreren Portalen auf der Karte sehen">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f7d32'/%3E%3Cpath d='M6 26V14l10-7 10 7v12h-7v-7h-6v7z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
   --bg:#f6f7f5;--panel:#fff;--text:#1d211c;--muted:#636b61;--line:#e3e6e1;
-  --accent:#2f7d32;--accent-soft:#e6f2e6;--warn:#d9822b;--warn-soft:#fbeedd;--grey:#9aa198;
-  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+  --accent:#2f7d32;--accent-soft:#e6f2e6;--warn:#d9822b;--warn-soft:#fbeedd;--grey:#9aa198;--grey-soft:#eef0ec;
+  --rot:#b3261e;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
-  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}}
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--grey-soft:#252924;--rot:#f2b8b5;--shadow:none}}
 :root[data-theme="dark"]{--bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
-  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--grey-soft:#252924;--rot:#f2b8b5;--shadow:none}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  display:grid;grid-template-columns:420px 1fr;grid-template-rows:100%;}
+  display:grid;grid-template-columns:430px 1fr;grid-template-rows:100%;}
 #seite{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
 #karte{min-height:0;height:100%}
 header{padding:16px 16px 10px;border-bottom:1px solid var(--line)}
@@ -30,15 +30,19 @@ h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
 h1 .logo{width:24px;height:24px;border-radius:6px;background:var(--accent);display:grid;place-items:center}
 .stand{color:var(--muted);font-size:12px;margin-top:2px}
 nav.tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid var(--line)}
-nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 4px;border-bottom:2px solid transparent;cursor:pointer}
+nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 4px;border-bottom:2px solid transparent;cursor:pointer;display:flex;gap:6px;justify-content:center;align-items:center}
 nav.tabs button[aria-selected="true"]{color:var(--accent);border-color:var(--accent)}
-.bereich{flex:1;overflow:auto;min-height:0}
+.zahl{font-size:11px;background:var(--grey-soft);color:var(--muted);border-radius:999px;padding:0 6px;font-weight:600}
+.zahl.warn{background:var(--warn-soft);color:var(--warn)}
+.bereich{flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column}
 .bereich[hidden]{display:none}
+.inhalt{padding:14px 16px;display:grid;gap:12px;align-content:start}
 .filter{padding:12px 16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
 .zeile{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.zeile.rechts{justify-content:flex-end}.zeile.zwischen{justify-content:space-between}
 .chip{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
-input[type=search],input[type=text],input[type=number],select{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
+input[type=search],input[type=text],input[type=email],input[type=number],select{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
 select{width:auto}
 .anzahl{font-size:12px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}
 ul.liste{list-style:none;margin:0;padding:0}
@@ -47,75 +51,107 @@ ul.liste li:hover,ul.liste li.aktiv{background:var(--accent-soft)}
 .bild{width:96px;height:72px;border-radius:8px;background:var(--line) center/cover no-repeat;display:grid;place-items:center;color:var(--grey)}
 .titel{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .fakten{margin-top:2px;font-variant-numeric:tabular-nums}
-.fakten b{font-weight:700}
 .meta{color:var(--muted);font-size:12px;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .badge{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;white-space:nowrap}
 .badge.neu{background:var(--warn-soft);color:var(--warn)}
-.badge.quelle{background:var(--line);color:var(--muted)}
+.badge.quelle{background:var(--grey-soft);color:var(--muted)}
 .badge.auch{background:var(--accent-soft);color:var(--accent)}
 .mehr{display:block;margin:12px auto;}
-.knopf{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+.knopf{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .knopf.leise{background:none;color:var(--accent)}
+.knopf.klein{padding:5px 10px;font-size:13px}
+.knopf.gefahr{background:none;border-color:var(--rot);color:var(--rot)}
 .knopf:disabled{opacity:.5;cursor:default}
-.gebiete{padding:12px 16px;display:grid;gap:12px}
-.karteikarte{border:1px solid var(--line);border-radius:var(--radius);padding:12px;display:grid;gap:8px;box-shadow:var(--shadow)}
+.knopf.breit{width:100%;padding:11px}
+.link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+.karteikarte{border:1px solid var(--line);border-radius:var(--radius);padding:12px;display:grid;gap:8px;box-shadow:var(--shadow);background:var(--panel)}
 .karteikarte h3{margin:0;font-size:14px}
-.paar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.gebiet-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.gebiet-zeile small{color:var(--muted)}
-.x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
 .hinweis{color:var(--muted);font-size:12px;margin:0}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;overflow:auto;margin:0;white-space:pre-wrap}
+.leer{padding:28px 16px;color:var(--muted);text-align:center;display:grid;gap:12px;justify-items:center}
 label.fein{font-size:12px;color:var(--muted);display:grid;gap:4px}
 input[type=range]{width:100%;accent-color:var(--accent)}
+.paar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
 .vorschlaege{border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.vorschlaege button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
+.vorschlaege[hidden]{display:none}
+.vorschlaege button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:8px 10px;font:inherit;cursor:pointer}
 .vorschlaege button:last-child{border-bottom:0}
-.leer{padding:24px 16px;color:var(--muted);text-align:center}
-.ortbox{margin:0 16px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.ortbox[hidden]{display:none}
-.ortbox button.ortwahl{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:8px 10px;font:inherit;cursor:pointer}
-.ortbox button.ortwahl:last-child{border-bottom:0}
-.ortbox button.ortwahl small{color:var(--muted)}
-.hinweisbox{margin:10px 16px;padding:12px;border-radius:var(--radius);background:var(--warn-soft);color:var(--text);display:grid;gap:8px}
+.vorschlaege small{color:var(--muted)}
+.hinweisbox{padding:12px;border-radius:var(--radius);background:var(--warn-soft);display:grid;gap:8px}
 .hinweisbox[hidden]{display:none}
-.status{background:var(--accent-soft);border-color:transparent}
-.status .zeile{gap:8px}
-.punkt{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
-.punkt.offen{background:var(--warn)}
-.speichern{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:6px}
-.speichern .knopf{width:100%;padding:11px}
-.link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
-dialog{border:0;border-radius:14px;padding:0;max-width:440px;width:calc(100% - 32px);background:var(--panel);color:var(--text);box-shadow:0 10px 40px rgba(0,0,0,.3)}
-dialog::backdrop{background:rgba(0,0,0,.4)}
-.dlg{padding:20px;display:grid;gap:12px}
-.dlg h2{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
-.dlg ol{margin:0;padding-left:20px;display:grid;gap:6px}
-.dlg .gross{font-size:15px}
-.ok{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:16px;flex:none}
-.fortschritt{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:13px}
-.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:dreh 1s linear infinite;flex:none}
-@keyframes dreh{to{transform:rotate(360deg)}}
-.fehler{color:#b3261e;font-size:13px}
-.zusammenfassung{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:0}
-.zusammenfassung dt{color:var(--muted)}.zusammenfassung dd{margin:0}
-/* Preisschilder auf der Karte */
+/* Suchen */
+.suche{border:1px solid var(--line);border-radius:var(--radius);padding:12px 12px 10px;display:grid;gap:6px;box-shadow:var(--shadow);cursor:pointer}
+.suche:hover{border-color:var(--accent)}
+.suche.pause{opacity:.7}
+.suche h3{margin:0;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.pill.gruen{background:var(--accent-soft);color:var(--accent)}
+.pill.orange{background:var(--warn-soft);color:var(--warn)}
+.pill.grau{background:var(--grey-soft);color:var(--muted)}
+.zeilen{display:grid;gap:2px;font-size:13px}
+.zeilen div{display:flex;gap:8px}
+.zeilen .ic{width:16px;text-align:center;flex:none;color:var(--muted)}
+.zahlen{display:flex;gap:14px;font-size:13px;padding-top:6px;border-top:1px solid var(--line);margin-top:4px;align-items:center}
+.zahlen b{font-size:16px}
+.zahlen .rechts{margin-left:auto;display:flex;gap:6px}
+.quellenleiste{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--radius);background:var(--grey-soft);cursor:pointer;font-size:13px}
+.quellenleiste.warn{background:var(--warn-soft)}
+.quellenleiste .pfeil{margin-left:auto;color:var(--muted)}
+/* Editor */
+.editor{display:grid;gap:14px}
+.schritt{display:grid;gap:8px}
+.schritt h3{margin:0;font-size:14px;display:flex;gap:8px;align-items:center}
+.nr{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;display:grid;place-items:center;flex:none}
+.gebiet{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--grey-soft)}
+.gebiet small{color:var(--muted)}
+.empf{display:flex;flex-wrap:wrap;gap:6px}
+.empf span{display:inline-flex;gap:4px;align-items:center;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:3px 4px 3px 10px;font-size:13px;font-weight:600}
+.empf span.std{background:var(--grey-soft);color:var(--muted);padding-right:10px;font-weight:500}
+.fusszeile{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:6px;margin-top:auto}
+details.weitere summary{cursor:pointer;font-weight:600}
+details.weitere[open] summary{margin-bottom:8px}
+/* Quellen */
+.quelle{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center}
+.quelle .sym{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:15px;grid-row:span 2}
+.sym.gruen{background:var(--accent-soft);color:var(--accent)}.sym.orange{background:var(--warn-soft);color:var(--warn)}.sym.grau{background:var(--grey-soft);color:var(--muted)}
+.quelle .unter{grid-column:2/4;color:var(--muted);font-size:12px}
+.anleitung{grid-column:1/4;margin-top:6px;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:13px}
+.anleitung[hidden]{display:none}
+.anleitung ol{margin:0;padding-left:18px;display:grid;gap:4px}
+code.adr{background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;font-weight:600}
+/* Karte */
 .preis{background:#fff;color:#1d211c;border:2px solid #2f7d32;border-radius:999px;padding:1px 7px;font:700 12px/18px system-ui,sans-serif;
   white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translate(-50%,-50%);display:inline-block;font-variant-numeric:tabular-nums}
 .preis.neu{border-color:#d9822b;background:#d9822b;color:#fff}
 .preis.ca{border-style:dashed}
-.preis.aktiv{background:#1d211c;border-color:#1d211c;color:#fff;z-index:1000}
+.preis.aktiv{background:#1d211c;border-color:#1d211c;color:#fff}
 .leaflet-div-icon.pin{background:none;border:0}
 .leaflet-popup-content{font:13px/1.45 system-ui,sans-serif;margin:0;width:280px!important}
 .pop img{width:100%;height:150px;object-fit:cover;display:block;border-radius:12px 12px 0 0}
-.pop .inhalt{padding:10px 14px 12px}
+.pop .inhalt{padding:10px 14px 12px;display:block}
 .pop h4{margin:0 0 4px;font-size:14px}
 .pop .preiszeile{font-size:16px;font-weight:700;margin-bottom:2px}
 .pop .ort{color:#666;margin-bottom:8px}
 .pop a{color:#2f7d32;font-weight:600;margin-right:10px}
+.kartenhinweis{position:absolute;z-index:500;left:50%;top:12px;transform:translateX(-50%);background:var(--warn);color:#fff;font-weight:600;padding:6px 14px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.2);pointer-events:none}
+.kartenhinweis[hidden]{display:none}
+/* Dialog */
+dialog{border:0;border-radius:14px;padding:0;max-width:460px;width:calc(100% - 32px);background:var(--panel);color:var(--text);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:20px;display:grid;gap:12px}
+.dlg h2{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+.dlg ol{margin:0;padding-left:20px;display:grid;gap:6px}
+.dlg .gross{font-size:15px;margin:0}
+.ok{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:16px;flex:none}
+.fortschritt{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:13px}
+.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:dreh 1s linear infinite;flex:none}
+@keyframes dreh{to{transform:rotate(360deg)}}
+.fehler{color:var(--rot);font-size:13px;margin:0}
+.zusammenfassung{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:0}
+.zusammenfassung dt{color:var(--muted)}.zusammenfassung dd{margin:0}
 @media (max-width:760px){
-  body{grid-template-columns:100%;grid-template-rows:46vh 1fr}
-  #karte{grid-row:1;height:46vh}
+  body{grid-template-columns:100%;grid-template-rows:42vh 1fr}
+  #karte{grid-row:1;height:42vh;position:relative}
   #seite{grid-row:2;border-right:0;border-top:1px solid var(--line)}
   header{padding:10px 16px 6px}
   h1{font-size:16px}
@@ -129,144 +165,181 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
     <div class="stand" id="stand">Lade Daten …</div>
   </header>
   <nav class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-tab="liste">Wohnungen</button>
-    <button role="tab" aria-selected="false" data-tab="suche">Meine Suche</button>
+    <button role="tab" aria-selected="true" data-tab="suchen">Suchen <span class="zahl" id="zSuchen"></span></button>
+    <button role="tab" aria-selected="false" data-tab="wohnungen">Wohnungen <span class="zahl" id="zWohnungen"></span></button>
+    <button role="tab" aria-selected="false" data-tab="quellen">Quellen <span class="zahl" id="zQuellen"></span></button>
   </nav>
 
-  <section class="bereich" id="tab-liste">
+  <!-- Suchen: Übersicht -->
+  <section class="bereich" id="tab-suchen">
+    <div class="inhalt" id="suchenListe"></div>
+  </section>
+
+  <!-- Suchen: Bearbeiten -->
+  <section class="bereich" id="tab-editor" hidden>
+    <div class="inhalt editor">
+      <div class="zeile zwischen"><button class="link" id="edZurueck">← Alle Suchen</button><span class="hinweis" id="edUngespeichert"></span></div>
+      <h2 style="margin:0;font-size:18px" id="edTitel">Neue Suche</h2>
+
+      <div class="schritt">
+        <h3><span class="nr">1</span>Wo suchst du?</h3>
+        <div id="edGebiete"></div>
+        <input type="text" id="edAdresse" placeholder="Ort oder Adresse eingeben, z. B. Thalwil" autocomplete="off">
+        <div class="vorschlaege" id="edVorschlaege" hidden></div>
+        <div id="edEntwurf" hidden class="karteikarte" style="box-shadow:none">
+          <label class="fein">Umkreis um <strong id="edEntwurfName"></strong>: <strong id="edRadiusWert">3 km</strong>
+            <input type="range" id="edRadius" min="0.5" max="20" step="0.5" value="3"></label>
+          <div class="zeile rechts"><button class="knopf leise klein" id="edEntwurfWeg">Verwerfen</button><button class="knopf klein" id="edEntwurfOk">Gebiet hinzufügen</button></div>
+        </div>
+        <p class="hinweis">Du kannst auch direkt auf die Karte tippen. Mehrere Gebiete sind möglich.</p>
+      </div>
+
+      <div class="schritt">
+        <h3><span class="nr">2</span>Was suchst du?</h3>
+        <div class="zeile"><button class="chip" data-angebot="RENT">Mieten</button><button class="chip" data-angebot="SALE">Kaufen</button></div>
+        <div class="zeile"><button class="chip" data-kat="APARTMENT">Wohnung</button><button class="chip" data-kat="HOUSE">Haus</button><button class="chip" data-kat="SHARED">WG-Zimmer</button></div>
+      </div>
+
+      <div class="schritt">
+        <h3><span class="nr">3</span>Budget und Grösse</h3>
+        <div class="paar">
+          <label class="fein">Preis ab (CHF)<input type="number" id="k_preis_min" min="0" step="50" placeholder="beliebig"></label>
+          <label class="fein">Preis bis (CHF)<input type="number" id="k_preis_max" min="0" step="50" placeholder="beliebig"></label>
+          <label class="fein">Zimmer ab<input type="number" id="k_zimmer_min" min="1" step="0.5" placeholder="beliebig"></label>
+          <label class="fein">Zimmer bis<input type="number" id="k_zimmer_max" min="1" step="0.5" placeholder="beliebig"></label>
+          <label class="fein">Fläche ab (m²)<input type="number" id="k_flaeche_min" min="0" step="5" placeholder="beliebig"></label>
+          <label class="fein">Fläche bis (m²)<input type="number" id="k_flaeche_max" min="0" step="5" placeholder="beliebig"></label>
+        </div>
+      </div>
+
+      <div class="schritt">
+        <h3><span class="nr">4</span>Wer bekommt die E-Mail?</h3>
+        <div class="empf" id="edEmpf"></div>
+        <div class="zeile" style="flex-wrap:nowrap"><input type="email" id="edEmail" placeholder="name@beispiel.ch" autocomplete="email"><button class="knopf leise" id="edEmailDazu">Hinzufügen</button></div>
+        <p class="fehler" id="edEmailFehler" hidden></p>
+        <p class="hinweis" id="edVersand"></p>
+      </div>
+
+      <div class="schritt">
+        <h3><span class="nr">5</span>Name der Suche</h3>
+        <input type="text" id="edName" placeholder="z. B. Thalwil 3 Zimmer">
+      </div>
+
+      <details class="weitere karteikarte" style="box-shadow:none">
+        <summary>Weitere Wünsche (optional)</summary>
+        <div class="schritt">
+          <span class="hinweis">Muss haben (nur Inserate, die das ausdrücklich angeben):</span>
+          <div class="zeile" id="edMerkmale"></div>
+          <span class="hinweis" style="margin-top:6px">Ausschliessen, wenn im Inserat vorkommt (durch Komma getrennt):</span>
+          <input type="text" id="k_ausschluss">
+        </div>
+      </details>
+      <button class="link" id="edLoeschen" style="color:var(--rot);justify-self:start" hidden>Diese Suche löschen</button>
+    </div>
+    <div class="fusszeile">
+      <button class="knopf breit" id="edSpeichern">Suche speichern</button>
+      <div class="zeile zwischen"><button class="link" id="edAbbrechen">Abbrechen</button><button class="link" id="trennen" hidden>Verbindung zu GitHub trennen</button></div>
+    </div>
+  </section>
+
+  <!-- Wohnungen -->
+  <section class="bereich" id="tab-wohnungen" hidden>
     <div class="filter">
+      <div class="zeile" id="suchFilter"></div>
       <input type="search" id="text" placeholder="Ort, Strasse oder Stichwort …" autocomplete="off">
-      <div class="zeile" id="quellen"></div>
+      <div class="vorschlaege" id="ortbox" hidden></div>
+      <div class="hinweisbox" id="ortHinweis" hidden></div>
       <div class="zeile">
         <select id="seit" aria-label="Erfasst seit">
-          <option value="0">Alle</option>
-          <option value="1">Neu seit gestern</option>
-          <option value="3">Neu seit 3 Tagen</option>
-          <option value="7">Neu seit 7 Tagen</option>
+          <option value="0">Alle</option><option value="1">Neu seit gestern</option>
+          <option value="3">Neu seit 3 Tagen</option><option value="7">Neu seit 7 Tagen</option>
         </select>
         <select id="zimmer" aria-label="Zimmer">
-          <option value="0">Zimmer: alle</option>
-          <option value="2">ab 2 Zimmer</option><option value="2.5">ab 2.5</option>
-          <option value="3">ab 3 Zimmer</option><option value="3.5">ab 3.5</option>
-          <option value="4">ab 4 Zimmer</option><option value="4.5">ab 4.5</option><option value="5">ab 5 Zimmer</option>
+          <option value="0">Zimmer: alle</option><option value="2">ab 2</option><option value="2.5">ab 2.5</option>
+          <option value="3">ab 3</option><option value="3.5">ab 3.5</option><option value="4">ab 4</option><option value="4.5">ab 4.5</option><option value="5">ab 5</option>
         </select>
         <select id="sortierung" aria-label="Sortierung">
-          <option value="neu">Neueste zuerst</option>
-          <option value="preis">Preis aufsteigend</option>
-          <option value="preis-">Preis absteigend</option>
-          <option value="flaeche-">Grösste zuerst</option>
-          <option value="m2">Preis pro m²</option>
+          <option value="neu">Neueste zuerst</option><option value="preis">Preis aufsteigend</option>
+          <option value="preis-">Preis absteigend</option><option value="flaeche-">Grösste zuerst</option><option value="m2">Preis pro m²</option>
         </select>
       </div>
       <label class="fein">Preis bis: <strong id="preisWert">alle</strong>
         <input type="range" id="preis" min="0" max="100" step="1" value="100"></label>
     </div>
-    <div class="ortbox" id="ortbox" hidden></div>
-    <div class="hinweisbox" id="ortHinweis" hidden></div>
     <div class="anzahl" id="anzahl"></div>
     <ul class="liste" id="liste"></ul>
     <button class="knopf leise mehr" id="mehr" hidden>Weitere anzeigen</button>
   </section>
 
-  <section class="bereich" id="tab-suche" hidden>
-    <div class="gebiete">
-      <div class="karteikarte status" id="status"></div>
-
-      <div class="karteikarte">
-        <h3>Gebiete</h3>
-        <div id="gebietListe"></div>
-        <input type="text" id="adresse" placeholder="Ort oder Adresse suchen …" autocomplete="off">
-        <div class="vorschlaege" id="vorschlaege" hidden></div>
-        <p class="hinweis">Oder auf die Karte tippen, um den Mittelpunkt zu setzen.</p>
-        <label class="fein">Umkreis: <strong id="radiusWert">3 km</strong>
-          <input type="range" id="radius" min="0.5" max="20" step="0.5" value="3"></label>
-        <input type="text" id="kreisName" placeholder="Name, z. B. Kreis 6">
-        <button class="knopf" id="kreisSpeichern" disabled>Gebiet hinzufügen</button>
-      </div>
-
-      <div class="karteikarte">
-        <h3>Objekt</h3>
-        <div class="zeile">
-          <button class="chip" data-angebot="RENT">Mieten</button>
-          <button class="chip" data-angebot="SALE">Kaufen</button>
-        </div>
-        <div class="zeile">
-          <button class="chip" data-kat="APARTMENT">Wohnung</button>
-          <button class="chip" data-kat="HOUSE">Haus</button>
-          <button class="chip" data-kat="SHARED">WG-Zimmer</button>
-        </div>
-      </div>
-
-      <div class="karteikarte">
-        <h3>Eckdaten</h3>
-        <div class="paar">
-          <label class="fein">Preis ab (CHF)<input type="number" id="k_preis_min" min="0" step="50"></label>
-          <label class="fein">Preis bis (CHF)<input type="number" id="k_preis_max" min="0" step="50"></label>
-          <label class="fein">Zimmer ab<input type="number" id="k_zimmer_min" min="1" step="0.5"></label>
-          <label class="fein">Zimmer bis<input type="number" id="k_zimmer_max" min="1" step="0.5"></label>
-          <label class="fein">Fläche ab (m²)<input type="number" id="k_flaeche_min" min="0" step="5"></label>
-          <label class="fein">Fläche bis (m²)<input type="number" id="k_flaeche_max" min="0" step="5"></label>
-        </div>
-      </div>
-
-      <div class="karteikarte">
-        <h3>Muss haben</h3>
-        <div class="zeile" id="merkmale"></div>
-        <p class="hinweis">Nur Inserate, die alle gewählten Merkmale ausdrücklich angeben (gilt für Flatfox; Portal-Suchabos filtern selbst).</p>
-      </div>
-
-      <div class="karteikarte">
-        <h3>Ausschliessen</h3>
-        <input type="text" id="k_ausschluss" placeholder="Wörter, durch Komma getrennt">
-        <p class="hinweis">Inserate mit diesen Begriffen in Titel oder Beschreibung werden verworfen.</p>
-      </div>
-
-    </div>
-    <div class="speichern">
-      <button class="knopf" id="speichern">Suche speichern</button>
-      <div class="zeile" style="justify-content:space-between">
-        <button class="link" id="zuruecksetzen">Änderungen verwerfen</button>
-        <button class="link" id="trennen" hidden>Verbindung zu GitHub trennen</button>
-      </div>
-    </div>
+  <!-- Quellen -->
+  <section class="bereich" id="tab-quellen" hidden>
+    <div class="inhalt" id="quellenInhalt"></div>
   </section>
 </aside>
-<main id="karte"></main>
+<main id="karte"><div class="kartenhinweis" id="kartenhinweis" hidden>Auf die Karte tippen, um ein Gebiet zu setzen</div></main>
 <dialog id="dlg"><div class="dlg" id="dlgInhalt"></div></dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
-const ENTWURF = "immosuche.entwurf.v1";
 const REPO = location.hostname.endsWith(".github.io")
   ? `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0] || "immosuche"}`
   : "bopsinger/immosuche";
+const API = `https://api.github.com/repos/${REPO}`;
+const TOKEN = "immosuche.github.v1";
 const MERKMALE = { balconygarden: "Balkon/Garten", lift: "Lift", petsallowed: "Haustiere", parkingspace: "Parkplatz",
   garage: "Garage", dishwasher: "Geschirrspüler", washingmachine: "Waschmaschine", view: "Aussicht",
   accessiblewithwheelchair: "Rollstuhlgängig", minergie: "Minergie", fireplace: "Cheminée" };
+const KAT = { APARTMENT: "Wohnung", HOUSE: "Haus", SHARED: "WG-Zimmer" };
+const AUSSCHLUSS = ["befristet", "Untermiete", "möbliert", "WG-Zimmer", "Mitbewohn", "Zwischenmiete", "temporary", "temporär", "furnished", "sublet", "shared flat"];
+const FELDER = ["preis_min", "preis_max", "zimmer_min", "zimmer_max", "flaeche_min", "flaeche_max"];
 const heute = new Date(); heute.setHours(0, 0, 0, 0);
 
-const zustand = { inserate: [], quellen: new Set(), alleQuellen: [], seit: 0, zimmer: 0, preisMax: null,
-  text: "", sortierung: "neu", sichtbar: 100, aktiv: null, aktiveSuche: null, suche: null };
+const z = { daten: null, inserate: [], suchen: [], filterSuche: null, quellen: new Set(), seit: 0, zimmer: 0, preisMax: null,
+  text: "", sortierung: "neu", sichtbar: 100, aktiv: null, tab: "suchen", ed: null, offeneAnleitung: null };
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
 const chf = (p) => p ? "CHF " + Math.round(p).toLocaleString("de-CH") : "Preis auf Anfrage";
-const kurz = (p) => !p ? "?" : p >= 10000 ? (p / 1e6 >= 1 ? (p / 1e6).toFixed(2).replace(/\.?0+$/, "") + " Mio" : Math.round(p / 1000) + "k") : Math.round(p).toLocaleString("de-CH");
+const kurz = (p) => !p ? "?" : p >= 10000 ? (p >= 1e6 ? (p / 1e6).toFixed(2).replace(/\.?0+$/, "") + " Mio" : Math.round(p / 1000) + "k") : Math.round(p).toLocaleString("de-CH");
 const datum = (iso) => iso && /^\d{4}-\d\d-\d\d/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : iso || "";
-const alterTage = (iso) => Math.round((heute - new Date(iso + "T00:00:00")) / 864e5);
+const alterTage = (iso) => Math.round((heute - new Date(iso.slice(0, 10) + "T00:00:00")) / 864e5);
+const vorTagen = (iso) => { const t = alterTage(iso); return t <= 0 ? "heute" : t === 1 ? "gestern" : `vor ${t} Tagen`; };
 const istNeu = (w) => alterTage(w.e) <= 1;
-function fakten(w) {
-  const t = [];
-  if (w.z) t.push(`${w.z} Zi.`);
-  if (w.f) t.push(`${Math.round(w.f)} m²`);
+const kopie = (o) => JSON.parse(JSON.stringify(o));
+const km = (x) => String(x).replace(".", ",") + " km";
+const ortName = (n) => String(n || "").replace(/^Ort\s+/, "").replace(/\s*\(.*\)$/, "").replace(/^\d{4}\s+/, "");
+function fakten(w) { const t = []; if (w.z) t.push(`${w.z} Zi.`); if (w.f) t.push(`${Math.round(w.f)} m²`); return t.join(" · "); }
+const ort = (w) => [w.s, `${w.plz || ""} ${w.o || ""}`.trim()].filter(Boolean).join(", ");
+function distanzKm(a, b) {
+  const r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r;
+  const h = Math.sin(dl / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+function maskieren(a) {
+  const [n, d] = a.trim().split("@"); if (!d) return "•••";
+  const t = d.split("."), end = t.pop();
+  return `${n.slice(0, 1)}•••@${t.join(".").slice(0, 1)}•••.${end}`;
+}
+function kurzKriterien(s) {
+  const t = [(s.angebot === "SALE" ? "Kaufen" : "Mieten") + " · " + ((s.kategorien || []).map((k) => KAT[k] || k).join(", ") || "alle Objekte")];
+  if (s.preis_min != null || s.preis_max != null) t.push(s.preis_max != null ? (s.preis_min != null ? `CHF ${kurz(s.preis_min)}–${kurz(s.preis_max)}` : `bis ${chf(s.preis_max)}`) : `ab ${chf(s.preis_min)}`);
+  if (s.zimmer_min != null || s.zimmer_max != null) t.push(s.zimmer_max != null ? `${s.zimmer_min ?? 1}–${s.zimmer_max} Zi.` : `ab ${s.zimmer_min} Zi.`);
+  if (s.flaeche_min != null) t.push(`ab ${s.flaeche_min} m²`);
+  if ((s.merkmale_pflicht || []).length) t.push(s.merkmale_pflicht.map((m) => MERKMALE[m] || m).join(", "));
   return t.join(" · ");
 }
-const ort = (w) => [w.s, `${w.plz || ""} ${w.o || ""}`.trim()].filter(Boolean).join(", ");
+const orteText = (s) => (s.orte || []).map((o) => `${ortName(o.name)} (${km(o.umkreis_km)})`).join(", ") || "noch kein Gebiet";
+const empfMasken = (s) => (s.empfaenger || []).map((e) => typeof e === "string" ? maskieren(e) : e.maske || "•••");
+const versandZeit = () => (z.daten && z.daten.zeit) || "06:17";
+function empfText(s) {
+  const m = empfMasken(s);
+  return m.length ? m.join(", ") : `${((z.daten || {}).standard_empfaenger || []).join(", ") || "Standardadresse"} (Standard)`;
+}
 
 // ---------- Karte ----------
-const karte = L.map("karte", { zoomControl: true }).setView([47.37, 8.54], 12);
+const karte = L.map("karte", { zoomControl: true }).setView([47.37, 8.54], 11);
 const swisstopo = (layer, ext) => L.tileLayer(
   `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`,
   { maxZoom: 19, maxNativeZoom: 18, attribution: '&copy; <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
@@ -275,57 +348,71 @@ L.control.layers({ "Landeskarte grau": grau, "Landeskarte farbig": swisstopo("ch
   "Luftbild": swisstopo("ch.swisstopo.swissimage", "jpeg") }, null, { position: "topright" }).addTo(karte);
 const gebietEbene = L.layerGroup().addTo(karte);
 const punkte = L.layerGroup().addTo(karte);
-let entwurf = null;
+
+function kreiseZeichnen() {
+  gebietEbene.clearLayers();
+  const liste = z.ed ? [{ s: z.ed.s, ed: true }] : z.suchen.filter((s) => s.aktiv !== false).map((s) => ({ s }));
+  for (const { s, ed } of liste) {
+    const hervor = ed || !z.filterSuche || z.filterSuche === s.id;
+    for (const o of s.orte || []) {
+      if (o.lat == null) continue;
+      L.circle([o.lat, o.lon], { radius: o.umkreis_km * 1000, color: "#d9822b", weight: hervor ? 2 : 1, opacity: hervor ? 1 : .4,
+        fillOpacity: hervor ? .06 : .02, interactive: false }).addTo(gebietEbene);
+    }
+  }
+  if (z.ed && z.ed.entwurf) L.circle([z.ed.entwurf.lat, z.ed.entwurf.lon], { radius: z.ed.entwurf.r * 1000, color: "#d9822b",
+    dashArray: "6 6", weight: 2, fillOpacity: .12, interactive: false }).addTo(gebietEbene);
+}
+function aufGebiete(orte) {
+  const b = orte.filter((o) => o.lat != null).map((o) => L.latLng(o.lat, o.lon).toBounds(o.umkreis_km * 2000));
+  if (b.length) karte.fitBounds(b.reduce((a, c) => a.extend(c)), { padding: [30, 30] });
+}
 
 function popup(w) {
   const auch = (w.a || []).map((x) => `<a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.q)}</a>`).join("");
   return `<div class="pop">${w.b ? `<img src="${esc(w.b)}" alt="" loading="lazy">` : ""}<div class="inhalt">
-    <div class="preiszeile">${chf(w.p)}</div>
-    <h4>${esc(w.t || "Inserat")}</h4>
+    <div class="preiszeile">${chf(w.p)}</div><h4>${esc(w.t || "Inserat")}</h4>
     <div>${esc(fakten(w))}${w.v ? ` · ab ${esc(datum(w.v))}` : ""}</div>
     <div class="ort">${esc(ort(w))}${w.ca ? " <em>(Lage ungefähr)</em>" : ""}</div>
-    <a href="${esc(w.u)}" target="_blank" rel="noopener">Auf ${esc(w.q)} öffnen</a>${auch}
-  </div></div>`;
+    <a href="${esc(w.u)}" target="_blank" rel="noopener">Auf ${esc(w.q)} öffnen</a>${auch}</div></div>`;
 }
 
-// ---------- Filter und Darstellung ----------
+// ---------- Wohnungen ----------
 function gefiltert() {
-  const q = norm(zustand.text).trim();
-  const l = zustand.inserate.filter((w) => {
-    if (!zustand.quellen.has(w.q)) return false;
-    if (zustand.seit && alterTage(w.e) > zustand.seit) return false;
-    if (zustand.zimmer && !(w.z >= zustand.zimmer)) return false;
-    if (zustand.preisMax != null && w.p && w.p > zustand.preisMax) return false;
+  const q = norm(z.text).trim();
+  const l = z.inserate.filter((w) => {
+    if (z.filterSuche && !(w.su || []).includes(z.filterSuche)) return false;
+    if (!z.quellen.has(w.q)) return false;
+    if (z.seit && alterTage(w.e) > z.seit) return false;
+    if (z.zimmer && !(w.z >= z.zimmer)) return false;
+    if (z.preisMax != null && w.p && w.p > z.preisMax) return false;
     if (q && !norm(`${w.t} ${w.s} ${w.plz} ${w.o} ${w.q}`).includes(q)) return false;
     return true;
   });
-  const s = zustand.sortierung, inf = Infinity;
+  const inf = Infinity;
   const k = { neu: (w) => -new Date(w.e), preis: (w) => w.p || inf, "preis-": (w) => -(w.p || 0),
-    "flaeche-": (w) => -(w.f || 0), m2: (w) => w.p && w.f ? w.p / w.f : inf }[s];
+    "flaeche-": (w) => -(w.f || 0), m2: (w) => w.p && w.f ? w.p / w.f : inf }[z.sortierung];
   return l.sort((a, b) => k(a) - k(b) || (a.p || inf) - (b.p || inf));
 }
-
 const marker = new Map();
 function zeichnen(passend = false) {
   const liste = gefiltert();
   punkte.clearLayers(); marker.clear();
-  for (const w of liste) {
+  if (!z.ed) for (const w of liste) {
     if (w.lat == null) continue;
     const icon = L.divIcon({ className: "pin", iconSize: null,
-      html: `<span class="preis${istNeu(w) ? " neu" : ""}${w.ca ? " ca" : ""}${w.id === zustand.aktiv ? " aktiv" : ""}">${kurz(w.p)}</span>` });
-    const m = L.marker([w.lat, w.lon], { icon, zIndexOffset: istNeu(w) ? 500 : 0, riseOnHover: true })
-      .bindPopup(() => popup(w), { maxWidth: 300, minWidth: 280 });
+      html: `<span class="preis${istNeu(w) ? " neu" : ""}${w.ca ? " ca" : ""}${w.id === z.aktiv ? " aktiv" : ""}">${kurz(w.p)}</span>` });
+    const m = L.marker([w.lat, w.lon], { icon, zIndexOffset: istNeu(w) ? 500 : 0, riseOnHover: true }).bindPopup(() => popup(w), { maxWidth: 300, minWidth: 280 });
     m.on("click", () => markieren(w.id, false));
     m.addTo(punkte); marker.set(w.id, m);
   }
   const neu = liste.filter(istNeu).length;
   $("anzahl").textContent = `${liste.length} Wohnung${liste.length === 1 ? "" : "en"} · ${neu} neu seit gestern`;
   const ul = $("liste"); ul.innerHTML = "";
-  if (!liste.length) ul.innerHTML = `<li class="leer" style="display:block">Keine Wohnungen für diese Filter.</li>`;
-  for (const w of liste.slice(0, zustand.sichtbar)) {
+  if (!liste.length) ul.innerHTML = `<li class="leer" style="display:grid">Keine Wohnungen für diese Filter.</li>`;
+  for (const w of liste.slice(0, z.sichtbar)) {
     const li = document.createElement("li");
-    li.dataset.id = w.id;
-    if (w.id === zustand.aktiv) li.className = "aktiv";
+    li.dataset.id = w.id; if (w.id === z.aktiv) li.className = "aktiv";
     const bild = w.b ? `style="background-image:url('${esc(w.b).replace(/'/g, "%27")}')"` : "";
     li.innerHTML = `<div class="bild" ${bild}>${w.b ? "" : "⌂"}</div><div>
       <div class="titel">${esc(w.t || "Inserat")}</div>
@@ -337,155 +424,337 @@ function zeichnen(passend = false) {
     li.addEventListener("click", () => markieren(w.id, true));
     ul.appendChild(li);
   }
-  $("mehr").hidden = liste.length <= zustand.sichtbar;
+  $("mehr").hidden = liste.length <= z.sichtbar;
   if (passend) {
     const b = L.latLngBounds(liste.filter((w) => w.lat != null).map((w) => [w.lat, w.lon]));
     if (b.isValid()) karte.fitBounds(b, { padding: [40, 40], maxZoom: 15 });
   }
 }
 function markieren(id, fliegen) {
-  const vorher = zustand.aktiv; zustand.aktiv = id;
-  for (const x of [vorher, id]) {
-    const m = marker.get(x); const el = m && m.getElement() && m.getElement().querySelector(".preis");
-    if (el) el.classList.toggle("aktiv", x === id);
-  }
+  const vorher = z.aktiv; z.aktiv = id;
+  for (const x of [vorher, id]) { const m = marker.get(x); const el = m && m.getElement() && m.getElement().querySelector(".preis"); if (el) el.classList.toggle("aktiv", x === id); }
   document.querySelectorAll("#liste li").forEach((li) => li.classList.toggle("aktiv", li.dataset.id === id));
   const m = marker.get(id);
   if (m && fliegen) { karte.flyTo(m.getLatLng(), Math.max(karte.getZoom(), 15), { duration: .6 }); setTimeout(() => m.openPopup(), 650); }
   const li = document.querySelector(`#liste li[data-id="${CSS.escape(id)}"]`);
   if (li && !fliegen) li.scrollIntoView({ block: "nearest" });
 }
-
-// ---------- Meine Suche ----------
-function ladeEntwurf() { try { return JSON.parse(localStorage.getItem(ENTWURF)); } catch { return null; } }
-function sichern() { try { localStorage.setItem(ENTWURF, JSON.stringify(zustand.suche)); } catch {} }
-const kopie = (o) => JSON.parse(JSON.stringify(o));
-
-function gebieteZeichnen() {
-  gebietEbene.clearLayers();
-  for (const o of zustand.suche.orte || []) {
-    if (o.lat == null) continue;
-    L.circle([o.lat, o.lon], { radius: (o.umkreis_km || 3) * 1000, color: "#d9822b", weight: 2, fillOpacity: .05, interactive: false })
-      .addTo(gebietEbene);
-  }
-  if (entwurf) entwurf.kreis.addTo(gebietEbene);
-  const box = $("gebietListe");
-  box.innerHTML = (zustand.suche.orte || []).length ? "" : `<p class="hinweis">Noch keine Gebiete.</p>`;
-  (zustand.suche.orte || []).forEach((o, i) => {
-    const d = document.createElement("div");
-    d.className = "gebiet-zeile";
-    d.innerHTML = `<div><strong>${esc(o.name)}</strong><br><small>Umkreis ${String(o.umkreis_km).replace(".", ",")} km</small></div>`;
-    const zeig = document.createElement("button"); zeig.className = "knopf leise"; zeig.textContent = "Zeigen";
-    zeig.onclick = () => o.lat != null && karte.flyToBounds(L.latLng(o.lat, o.lon).toBounds(o.umkreis_km * 2000), { padding: [20, 20] });
-    const x = document.createElement("button"); x.className = "x"; x.title = "Entfernen"; x.textContent = "×";
-    x.onclick = () => { zustand.suche.orte.splice(i, 1); geaendert(); };
-    const r = document.createElement("div"); r.className = "zeile"; r.append(zeig, x); d.append(r);
-    box.appendChild(d);
-  });
+function suchFilterZeichnen() {
+  const box = $("suchFilter"); box.innerHTML = "";
+  const knopf = (id, text) => {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = text;
+    b.setAttribute("aria-pressed", z.filterSuche === id);
+    b.onclick = () => { z.filterSuche = id; suchFilterZeichnen(); kreiseZeichnen(); z.sichtbar = 100; zeichnen(true); };
+    box.appendChild(b);
+  };
+  knopf(null, `Alle (${z.inserate.length})`);
+  for (const s of z.suchen) if (s.aktiv !== false) knopf(s.id, `${s.name} (${z.inserate.filter((w) => (w.su || []).includes(s.id)).length})`);
 }
 
-const FELDER = ["preis_min", "preis_max", "zimmer_min", "zimmer_max", "flaeche_min", "flaeche_max"];
-function formularFuellen() {
-  const s = zustand.suche;
+// Ortssuche in «Wohnungen»
+const inDerNaehe = (lat, lon, r = 2) => z.inserate.filter((w) => w.lat != null && distanzKm([w.lat, w.lon], [lat, lon]) <= r).length;
+const suchenBei = (lat, lon) => z.suchen.filter((s) => s.aktiv !== false && (s.orte || []).some((o) => o.lat != null && distanzKm([o.lat, o.lon], [lat, lon]) <= o.umkreis_km));
+let ortTimer, ortNr = 0;
+async function geoSuche(q) {
+  const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&origins=gg25,zipcode,gazetteer,address&sr=4326&limit=5&searchText=${encodeURIComponent(q)}`;
+  const t = (await (await fetch(u)).json()).results || [];
+  const gesehen = new Set(), out = [];
+  for (const r of t) { const d = document.createElement("div"); d.innerHTML = r.attrs.label; const name = d.textContent.trim();
+    if (!gesehen.has(name)) { gesehen.add(name); out.push({ name, lat: r.attrs.lat, lon: r.attrs.lon }); } }
+  return out;
+}
+function ortsvorschlaege(q) {
+  clearTimeout(ortTimer);
+  if (q.trim().length < 3) { $("ortbox").hidden = true; return; }
+  const nr = ++ortNr;
+  ortTimer = setTimeout(async () => {
+    try {
+      const t = await geoSuche(q); if (nr !== ortNr) return;
+      const box = $("ortbox"); box.innerHTML = "";
+      for (const r of t.slice(0, 4)) {
+        const n = inDerNaehe(r.lat, r.lon);
+        const b = document.createElement("button");
+        b.innerHTML = `<span>📍 ${esc(r.name)}</span><small>${n ? `${n} Wohnung${n === 1 ? "" : "en"} in der Nähe` : suchenBei(r.lat, r.lon).length ? "zurzeit keine" : "in keiner Suche"}</small>`;
+        b.onclick = () => ortGewaehlt(r);
+        box.appendChild(b);
+      }
+      box.hidden = !box.children.length;
+    } catch { $("ortbox").hidden = true; }
+  }, 250);
+}
+function ortGewaehlt(r) {
+  $("ortbox").hidden = true; $("text").value = ""; z.text = ""; z.sichtbar = 100; zeichnen();
+  karte.flyTo([r.lat, r.lon], 14, { duration: .8 });
+  const name = ortName(r.name), box = $("ortHinweis"), drin = suchenBei(r.lat, r.lon);
+  if (drin.length && inDerNaehe(r.lat, r.lon)) { box.hidden = true; return; }
+  box.innerHTML = drin.length
+    ? `<div><strong>Zurzeit keine passenden Wohnungen in ${esc(name)}.</strong><br><span class="hinweis">${esc(name)} gehört zur Suche «${esc(drin[0].name)}»; neue Inserate kommen automatisch per E-Mail.</span></div>`
+    : `<div><strong>${esc(name)} ist in keiner deiner Suchen.</strong><br><span class="hinweis">Lege eine Suche an; danach erscheinen die Wohnungen hier und neue kommen per E-Mail.</span></div>
+       <button class="knopf" id="ortNeu">Suche für ${esc(name)} anlegen</button>`;
+  box.hidden = false;
+  const k = $("ortNeu"); if (k) k.onclick = () => { box.hidden = true; editorOeffnen(null, { name, lat: r.lat, lon: r.lon, umkreis_km: 3 }); };
+}
+
+// ---------- Suchen: Übersicht ----------
+function suchenZeichnen() {
+  const box = $("suchenListe"), d = z.daten || {};
+  const qs = d.quellen || [], verbunden = qs.filter((q) => q.ok).length;
+  box.innerHTML = `
+    <button class="knopf breit" id="neueSuche">+ Neue Suche</button>
+    <div class="quellenleiste ${verbunden < qs.length ? "warn" : ""}" id="zuQuellen">
+      <span>${verbunden < qs.length ? "⚠" : "✓"}</span>
+      <span><b>${verbunden} von ${qs.length} Quellen verbunden</b><br><span class="hinweis">${esc(qs.map((q) => (q.ok ? "✓ " : "○ ") + q.name).join("   "))}</span></span>
+      <span class="pfeil">›</span></div>`;
+  if (!z.suchen.length) box.insertAdjacentHTML("beforeend", `<div class="leer"><strong>Noch keine Suche</strong><span>Lege deine erste Suche an: Gebiet wählen, Budget festlegen, E-Mail-Adresse eintragen. Fertig.</span></div>`);
+  for (const s of z.suchen) {
+    const aktiv = s.aktiv !== false;
+    const n = z.inserate.filter((w) => (w.su || []).includes(s.id));
+    const neu = n.filter(istNeu).length;
+    const el = document.createElement("div");
+    el.className = "suche" + (aktiv ? "" : " pause");
+    el.innerHTML = `<h3><span>${esc(s.name)}</span><span class="pill ${aktiv ? "gruen" : "grau"}">${aktiv ? "Aktiv" : "Pausiert"}</span></h3>
+      <div class="zeilen">
+        <div><span class="ic">📍</span><span>${esc(orteText(s))}</span></div>
+        <div><span class="ic">⌂</span><span>${esc(kurzKriterien(s))}</span></div>
+        <div><span class="ic">✉</span><span>${aktiv ? `${esc(empfText(s))}, täglich um ca. ${versandZeit()} Uhr bei neuen Wohnungen` : "pausiert, keine E-Mails"}</span></div>
+        ${s.letzte_mail ? `<div><span class="ic">↗</span><span class="hinweis">Letzte E-Mail ${vorTagen(s.letzte_mail)} mit ${s.letzte_mail_anzahl} Wohnung${s.letzte_mail_anzahl === 1 ? "" : "en"}</span></div>` : ""}
+      </div>
+      <div class="zahlen"><span><b>${n.length}</b> Wohnungen</span>${neu ? `<span class="badge neu">${neu} neu</span>` : ""}
+        <span class="rechts"><button class="knopf leise klein" data-a="pause">${aktiv ? "Pausieren" : "Fortsetzen"}</button><button class="knopf klein" data-a="edit">Bearbeiten</button></span></div>`;
+    el.onclick = (e) => {
+      const a = e.target.closest("[data-a]");
+      if (a && a.dataset.a === "edit") return editorOeffnen(s.id);
+      if (a && a.dataset.a === "pause") return pausieren(s);
+      z.filterSuche = s.id; tab("wohnungen"); suchFilterZeichnen(); kreiseZeichnen(); zeichnen(true);
+    };
+    el.onmouseenter = () => { if (!z.ed) { z.filterSuche = s.id; kreiseZeichnen(); } };
+    el.onmouseleave = () => { if (!z.ed && z.tab === "suchen") { z.filterSuche = null; kreiseZeichnen(); } };
+    box.appendChild(el);
+  }
+  $("neueSuche").onclick = () => editorOeffnen(null);
+  $("zuQuellen").onclick = () => tab("quellen");
+  $("zSuchen").textContent = z.suchen.length || "";
+}
+
+// ---------- Quellen ----------
+function quellenZeichnen() {
+  const d = z.daten || {}, p = d.postfach || {}, qs = d.quellen || [];
+  const verbunden = qs.filter((q) => q.ok).length;
+  $("zQuellen").textContent = `${verbunden}/${qs.length}`;
+  $("zQuellen").className = "zahl" + (verbunden < qs.length ? " warn" : "");
+  const adr = p.adresse ? `<code class="adr">${esc(p.adresse)}</code>` : "deine Sammel-Gmail-Adresse";
+  let html = `<p class="hinweis" style="font-size:13px">Flatfox wird direkt abgefragt. Homegate, ImmoScout24, Newhome und Comparis sperren automatische Abfragen; sie liefern ihre Inserate über <b>Suchabos</b>, die an dein Sammelpostfach gehen. Bei jedem Suchlauf wird geprüft, welche Portale Mails geschickt haben.</p>`;
+  for (const q of qs) {
+    let sym, pill, unter;
+    if (q.art === "direkt") { sym = "gruen"; pill = `<span class="pill gruen">Verbunden</span>`; unter = `Direkt angebunden · ${q.inserate || 0} passende Inserate im letzten Lauf`; }
+    else if (!q.ok) { sym = "grau"; pill = `<span class="pill grau">Nicht eingerichtet</span>`; unter = "Noch keine Suchabo-Mail im Sammelpostfach angekommen."; }
+    else {
+      const alt = q.letzte_mail ? alterTage(q.letzte_mail) : 99;
+      sym = alt > 7 ? "orange" : "gruen";
+      pill = alt > 7 ? `<span class="pill orange">Keine Mails seit ${alt} Tagen</span>` : `<span class="pill gruen">Verbunden</span>`;
+      unter = `Letzte Abo-Mail ${q.letzte_mail ? vorTagen(q.letzte_mail) : "unbekannt"} · ${q.mails} Mail${q.mails === 1 ? "" : "s"}, ${q.inserate_gesamt} Inserate bisher`;
+    }
+    html += `<div class="karteikarte"><div class="quelle"><span class="sym ${sym}">${esc(q.name[0])}</span><strong>${esc(q.name)}</strong>${pill}
+      <span class="unter">${esc(unter)}</span>
+      ${q.art === "suchabo" ? `<button class="link" data-anl="${esc(q.id)}" style="grid-column:2/4;justify-self:start">${z.offeneAnleitung === q.id ? "Anleitung ausblenden" : q.ok ? "Anleitung anzeigen" : "So richtest du das Suchabo ein"}</button>
+      <div class="anleitung" ${z.offeneAnleitung === q.id ? "" : "hidden"}><ol>
+        <li><a href="${esc(q.link)}" target="_blank" rel="noopener"><b>${esc(q.name)}</b> öffnen</a> und dieselbe Suche eingeben wie hier (Ort, Umkreis, Preis, Zimmer).</li>
+        <li>Bei den Ergebnissen <b>«Suchabo»</b>, <b>«Suche speichern»</b> oder die <b>Glocke</b> anklicken.</li>
+        <li>Konto mit ${adr} anlegen bzw. dich damit anmelden (nicht mit deiner privaten Adresse).</li>
+        <li>Häufigkeit <b>täglich</b> oder <b>sofort</b> wählen.</li>
+        <li>Im Sammelpostfach die Bestätigungsmail von ${esc(q.name)} öffnen und den Link anklicken.</li>
+      </ol><p class="hinweis" style="margin-top:6px">Sobald die erste Abo-Mail eingetroffen ist, steht hier «Verbunden» (nach dem nächsten Suchlauf).</p></div>` : ""}
+    </div></div>`;
+  }
+  html += `<div class="karteikarte"><div class="quelle"><span class="sym ${p.ok ? "gruen" : "orange"}">✉</span><strong>Sammelpostfach</strong>
+    ${p.ok ? `<span class="pill gruen">Erreichbar</span>` : `<span class="pill orange">Problem</span>`}
+    <span class="unter">${p.adresse ? esc(p.adresse) + " · " : ""}${p.ok ? `zuletzt geprüft ${p.geprueft ? vorTagen(p.geprueft) + " " + new Date(p.geprueft).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" }) : ""}` : esc(p.fehler || "nicht geprüft")}</span></div></div>`;
+  $("quellenInhalt").innerHTML = html;
+  $("quellenInhalt").querySelectorAll("[data-anl]").forEach((b) => b.onclick = () => {
+    z.offeneAnleitung = z.offeneAnleitung === b.dataset.anl ? null : b.dataset.anl; quellenZeichnen(); });
+}
+
+// ---------- Editor ----------
+const neueId = () => Math.random().toString(36).slice(2, 8);
+function editorOeffnen(id, gebiet = null) {
+  const vorlage = id ? kopie(z.suchen.find((s) => s.id === id)) : { id: neueId(), name: "", aktiv: true, empfaenger: [],
+    angebot: "RENT", kategorien: ["APARTMENT"], orte: [], preis_min: null, preis_max: null, zimmer_min: null, zimmer_max: null,
+    flaeche_min: null, flaeche_max: null, merkmale_pflicht: [], ausschluss_woerter: AUSSCHLUSS.slice() };
+  for (const f of FELDER) if (!(f in vorlage)) vorlage[f] = null;
+  if (gebiet) { vorlage.orte.push({ ...gebiet, lat: +(+gebiet.lat).toFixed(6), lon: +(+gebiet.lon).toFixed(6) }); if (!vorlage.name) vorlage.name = gebiet.name; }
+  z.ed = { neu: !id, s: vorlage, start: JSON.stringify(vorlage), neueEmails: [], entwurf: null, nameGesetzt: !!vorlage.name && !!id };
+  tab("editor");
+  $("edTitel").textContent = id ? `«${vorlage.name}» bearbeiten` : "Neue Suche";
+  $("edLoeschen").hidden = !id;
+  editorFuellen();
+  kreiseZeichnen(); zeichnen();
+  if (vorlage.orte.length) aufGebiete(vorlage.orte);
+  if (!vorlage.orte.length) setTimeout(() => $("edAdresse").focus(), 50);
+}
+function editorFuellen() {
+  const s = z.ed.s;
   document.querySelectorAll("[data-angebot]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.angebot === (s.angebot || "RENT")));
   document.querySelectorAll("[data-kat]").forEach((b) => b.setAttribute("aria-pressed", (s.kategorien || []).includes(b.dataset.kat)));
   for (const f of FELDER) $("k_" + f).value = s[f] ?? "";
   $("k_ausschluss").value = (s.ausschluss_woerter || []).join(", ");
-  const box = $("merkmale"); box.innerHTML = "";
-  for (const [k, name] of Object.entries(MERKMALE)) {
-    const b = document.createElement("button"); b.className = "chip"; b.textContent = name;
+  $("edName").value = s.name || "";
+  const mb = $("edMerkmale"); mb.innerHTML = "";
+  for (const [k, n] of Object.entries(MERKMALE)) {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = n;
     b.setAttribute("aria-pressed", (s.merkmale_pflicht || []).includes(k));
-    b.onclick = () => {
-      const m = new Set(s.merkmale_pflicht || []); m.has(k) ? m.delete(k) : m.add(k);
-      s.merkmale_pflicht = [...m]; b.setAttribute("aria-pressed", m.has(k)); geaendert(false);
-    };
-    box.appendChild(b);
+    b.onclick = () => { const m = new Set(s.merkmale_pflicht || []); m.has(k) ? m.delete(k) : m.add(k); s.merkmale_pflicht = [...m]; b.setAttribute("aria-pressed", m.has(k)); edGeaendert(); };
+    mb.appendChild(b);
   }
-  gebieteZeichnen(); statusZeigen();
+  gebieteListe(); empfaengerListe(); edGeaendert();
 }
-function geaendert(neuZeichnen = true) { sichern(); if (neuZeichnen) gebieteZeichnen(); statusZeigen(); }
-
-document.querySelectorAll("[data-angebot]").forEach((b) => b.onclick = () => { zustand.suche.angebot = b.dataset.angebot; formularFuellen(); sichern(); });
+function gebieteListe() {
+  const box = $("edGebiete"); box.innerHTML = "";
+  z.ed.s.orte.forEach((o, i) => {
+    const d = document.createElement("div"); d.className = "gebiet"; d.style.marginBottom = "6px";
+    d.innerHTML = `<span><strong>${esc(ortName(o.name))}</strong> <small>Umkreis ${km(o.umkreis_km)}</small></span>`;
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Gebiet entfernen";
+    x.onclick = () => { z.ed.s.orte.splice(i, 1); gebieteListe(); kreiseZeichnen(); edGeaendert(); };
+    d.appendChild(x); box.appendChild(d);
+  });
+}
+function empfaengerListe() {
+  const box = $("edEmpf"); box.innerHTML = "";
+  const s = z.ed.s;
+  (s.empfaenger || []).forEach((e, i) => {
+    const sp = document.createElement("span"); sp.textContent = typeof e === "string" ? maskieren(e) : e.maske || "•••";
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Entfernen"; x.style.fontSize = "15px";
+    x.onclick = () => { s.empfaenger.splice(i, 1); empfaengerListe(); edGeaendert(); };
+    sp.appendChild(x); box.appendChild(sp);
+  });
+  z.ed.neueEmails.forEach((e, i) => {
+    const sp = document.createElement("span"); sp.textContent = e;
+    const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.title = "Entfernen"; x.style.fontSize = "15px";
+    x.onclick = () => { z.ed.neueEmails.splice(i, 1); empfaengerListe(); edGeaendert(); };
+    sp.appendChild(x); box.appendChild(sp);
+  });
+  const leer = !(s.empfaenger || []).length && !z.ed.neueEmails.length;
+  if (leer) box.innerHTML = `<span class="std">✉ ${esc(((z.daten || {}).standard_empfaenger || []).join(", ") || "Standardadresse")} (Standard)</span>`;
+  $("edVersand").textContent = `Neue Wohnungen kommen täglich um ca. ${versandZeit()} Uhr per E-Mail, nur wenn es neue gibt. `
+    + "Adressen werden verschlüsselt gespeichert und hier nur abgekürzt angezeigt." + (leer ? " Ohne eigene Adresse geht die E-Mail an die Standardadresse." : "");
+}
+function emailHinzufuegen() {
+  const v = $("edEmail").value.trim(), f = $("edEmailFehler");
+  if (!v) return true;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { f.textContent = "Das sieht nicht nach einer gültigen E-Mail-Adresse aus."; f.hidden = false; return false; }
+  if (!(z.daten || {}).schluessel) { f.textContent = "Die Verschlüsselung ist noch nicht bereit; bitte nach dem nächsten Suchlauf erneut versuchen."; f.hidden = false; return false; }
+  f.hidden = true; if (!z.ed.neueEmails.includes(v)) z.ed.neueEmails.push(v);
+  $("edEmail").value = ""; empfaengerListe(); edGeaendert(); return true;
+}
+$("edEmailDazu").onclick = emailHinzufuegen;
+$("edEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); emailHinzufuegen(); } });
+const edUngespeichert = () => z.ed && (JSON.stringify(z.ed.s) !== z.ed.start || z.ed.neueEmails.length > 0);
+function edGeaendert() {
+  if (!z.ed) return;
+  $("edUngespeichert").textContent = edUngespeichert() ? "Nicht gespeichert" : "";
+  $("edSpeichern").disabled = !z.ed.neu && !edUngespeichert();
+}
+document.querySelectorAll("[data-angebot]").forEach((b) => b.onclick = () => { z.ed.s.angebot = b.dataset.angebot; editorFuellen(); });
 document.querySelectorAll("[data-kat]").forEach((b) => b.onclick = () => {
-  const k = new Set(zustand.suche.kategorien || []); k.has(b.dataset.kat) ? k.delete(b.dataset.kat) : k.add(b.dataset.kat);
-  zustand.suche.kategorien = [...k]; b.setAttribute("aria-pressed", k.has(b.dataset.kat)); geaendert(false);
+  const k = new Set(z.ed.s.kategorien || []); k.has(b.dataset.kat) ? k.delete(b.dataset.kat) : k.add(b.dataset.kat);
+  z.ed.s.kategorien = [...k]; b.setAttribute("aria-pressed", k.has(b.dataset.kat)); edGeaendert();
 });
-for (const f of FELDER) $("k_" + f).addEventListener("input", (e) => {
-  const v = e.target.value.trim(); zustand.suche[f] = v === "" ? null : +v; geaendert(false);
-});
-$("k_ausschluss").addEventListener("input", (e) => {
-  zustand.suche.ausschluss_woerter = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); geaendert(false);
-});
+for (const f of FELDER) $("k_" + f).addEventListener("input", (e) => { const v = e.target.value.trim(); z.ed.s[f] = v === "" ? null : +v; edGeaendert(); });
+$("k_ausschluss").addEventListener("input", (e) => { z.ed.s.ausschluss_woerter = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); edGeaendert(); });
+$("edName").addEventListener("input", (e) => { z.ed.s.name = e.target.value; z.ed.nameGesetzt = true; edGeaendert(); });
 
-function yaml(s = zustand.suche, kopf = true) {
-  const q = (x) => JSON.stringify(x), n = (x) => x == null ? "null" : String(x);
-  const liste = (a) => `[${(a || []).map(q).join(", ")}]`;
-  return `${kopf ? `# Gespeichert über die Immosuche-Karte am ${new Date().toLocaleDateString("de-CH")}.\n` : ""}suche:
-  angebot: ${s.angebot || "RENT"}
-  kategorien: ${liste(s.kategorien)}
-  orte:
-${(s.orte || []).map((o) => `    - name: ${q(o.name)}\n      lat: ${(+o.lat).toFixed(6)}\n      lon: ${(+o.lon).toFixed(6)}\n      umkreis_km: ${o.umkreis_km}`).join("\n") || "    []"}
-${FELDER.map((f) => `  ${f}: ${n(s[f])}`).join("\n")}
-  merkmale_pflicht: ${liste(s.merkmale_pflicht)}
-  ausschluss_woerter: ${liste(s.ausschluss_woerter)}
-`;
-}
-
-function entwurfSetzen(lat, lon) {
-  const r = +$("radius").value * 1000;
-  if (entwurf) { entwurf.lat = lat; entwurf.lon = lon; entwurf.kreis.setLatLng([lat, lon]); }
-  else entwurf = { lat, lon, kreis: L.circle([lat, lon], { radius: r, color: "#d9822b", dashArray: "6 6", weight: 2, fillOpacity: .12 }) };
-  gebieteZeichnen();
-  $("kreisSpeichern").disabled = false;
-  karte.fitBounds(entwurf.kreis.getBounds(), { padding: [40, 40] });
-}
-karte.on("click", (e) => { if (aktuellerTab === "suche") entwurfSetzen(e.latlng.lat, e.latlng.lng); });
-$("radius").addEventListener("input", () => {
-  $("radiusWert").textContent = `${String($("radius").value).replace(".", ",")} km`;
-  if (entwurf) entwurf.kreis.setRadius(+$("radius").value * 1000);
+// Gebiet setzen: Ortssuche oder Klick auf die Karte
+let edTimer, edNr = 0;
+$("edAdresse").addEventListener("input", () => {
+  clearTimeout(edTimer);
+  const q = $("edAdresse").value.trim();
+  if (q.length < 2) { $("edVorschlaege").hidden = true; return; }
+  const nr = ++edNr;
+  edTimer = setTimeout(async () => {
+    try {
+      const t = await geoSuche(q); if (nr !== edNr) return;
+      const box = $("edVorschlaege"); box.innerHTML = "";
+      for (const r of t) { const b = document.createElement("button"); b.innerHTML = `<span>📍 ${esc(r.name)}</span>`;
+        b.onclick = () => { box.hidden = true; $("edAdresse").value = ""; entwurfSetzen(r.lat, r.lon, ortName(r.name)); }; box.appendChild(b); }
+      box.hidden = !t.length;
+    } catch { $("edVorschlaege").hidden = true; }
+  }, 220);
 });
-$("kreisSpeichern").onclick = () => {
-  if (!entwurf) return;
-  (zustand.suche.orte ||= []).push({ name: $("kreisName").value.trim() || `Gebiet ${zustand.suche.orte.length + 1}`,
-    lat: +entwurf.lat.toFixed(6), lon: +entwurf.lon.toFixed(6), umkreis_km: +$("radius").value });
-  entwurf = null; $("kreisName").value = ""; $("adresse").value = ""; $("kreisSpeichern").disabled = true;
-  geaendert();
+function entwurfSetzen(lat, lon, name) {
+  z.ed.entwurf = { lat, lon, name, r: +$("edRadius").value };
+  $("edEntwurfName").textContent = name; $("edEntwurf").hidden = false;
+  kreiseZeichnen(); karte.fitBounds(L.latLng(lat, lon).toBounds(z.ed.entwurf.r * 2400), { padding: [20, 20] });
+}
+karte.on("click", async (e) => {
+  if (z.tab !== "editor") return;
+  let name = "Gewählter Punkt";
+  entwurfSetzen(e.latlng.lat, e.latlng.lng, name);
+  try { // nächstgelegene Gemeinde als Namen
+    const u = `https://api3.geo.admin.ch/rest/services/api/MapServer/identify?geometryType=esriGeometryPoint&geometry=${e.latlng.lng},${e.latlng.lat}&sr=4326&layers=all:ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill&tolerance=0&returnGeometry=false&imageDisplay=1,1,96&mapExtent=0,0,1,1`;
+    const r = (await (await fetch(u)).json()).results || [];
+    if (r[0] && z.ed && z.ed.entwurf) { z.ed.entwurf.name = r[0].attributes.gemname || r[0].attributes.label || name; $("edEntwurfName").textContent = z.ed.entwurf.name; }
+  } catch {}
+});
+$("edRadius").addEventListener("input", () => {
+  $("edRadiusWert").textContent = km($("edRadius").value);
+  if (z.ed && z.ed.entwurf) { z.ed.entwurf.r = +$("edRadius").value; kreiseZeichnen(); }
+});
+$("edEntwurfWeg").onclick = () => { z.ed.entwurf = null; $("edEntwurf").hidden = true; kreiseZeichnen(); };
+$("edEntwurfOk").onclick = () => {
+  const e = z.ed.entwurf; if (!e) return;
+  z.ed.s.orte.push({ name: e.name, lat: +e.lat.toFixed(6), lon: +e.lon.toFixed(6), umkreis_km: e.r });
+  if (!z.ed.nameGesetzt) { z.ed.s.name = z.ed.s.orte.map((o) => ortName(o.name)).join(", "); $("edName").value = z.ed.s.name; }
+  z.ed.entwurf = null; $("edEntwurf").hidden = true; gebieteListe(); kreiseZeichnen(); edGeaendert();
 };
-$("zuruecksetzen").onclick = () => {
-  zustand.suche = kopie(zustand.aktiveSuche); try { localStorage.removeItem(ENTWURF); } catch {}
-  entwurf = null; formularFuellen();
+function editorSchliessen(fragen = true) {
+  if (fragen && edUngespeichert() && !confirm("Änderungen verwerfen?")) return;
+  z.ed = null; tab("suchen"); kreiseZeichnen(); zeichnen();
+}
+$("edZurueck").onclick = () => editorSchliessen();
+$("edAbbrechen").onclick = () => editorSchliessen();
+$("edLoeschen").onclick = () => {
+  if (!confirm(`Die Suche «${z.ed.s.name}» löschen? Es kommen dafür keine E-Mails mehr.`)) return;
+  const id = z.ed.s.id;
+  speichern((l) => l.filter((s) => s.id !== id), { titel: "Suche gelöscht", text: `«${esc(z.ed.s.name)}» wurde gelöscht.`, lauf: false });
 };
-
-// ---------- Status, Speichern über GitHub ----------
-const KAT = { APARTMENT: "Wohnung", HOUSE: "Haus", SHARED: "WG-Zimmer" };
-function kurzKriterien(s) {
-  const t = [(s.angebot === "SALE" ? "Kaufen" : "Mieten") + ": " + ((s.kategorien || []).map((k) => KAT[k] || k).join(", ") || "alle")];
-  if (s.preis_min != null || s.preis_max != null) t.push(s.preis_max != null ? `${s.preis_min != null ? chf(s.preis_min) + " bis " : "bis "}${chf(s.preis_max)}` : `ab ${chf(s.preis_min)}`);
-  if (s.zimmer_min != null || s.zimmer_max != null) t.push(`${s.zimmer_min ?? "?"}${s.zimmer_max != null ? "–" + s.zimmer_max : "+"} Zimmer`);
-  if (s.flaeche_min != null) t.push(`ab ${s.flaeche_min} m²`);
-  if ((s.merkmale_pflicht || []).length) t.push(s.merkmale_pflicht.map((m) => MERKMALE[m] || m).join(", "));
-  return t.join(" · ");
-}
-const orteText = (s) => (s.orte || []).map((o) => `${o.name} (${String(o.umkreis_km).replace(".", ",")} km)`).join(", ") || "keine Gebiete";
-function versandText() {
-  const v = zustand.versand || {}, an = (v.an || []).join(", ");
-  return an ? `täglich um ca. ${v.zeit || "06:17"} Uhr an ${an}` : "an die hinterlegte Adresse (noch keine eingetragen)";
-}
-const ungespeichert = () => zustand.aktiveSuche && yaml(zustand.suche, false) !== yaml(zustand.aktiveSuche, false);
-function statusZeigen() {
-  if (!zustand.aktiveSuche) return;
-  const offen = ungespeichert();
-  $("status").innerHTML = `<div class="zeile"><span class="punkt${offen ? " offen" : ""}"></span><strong>${offen ? "Ungespeicherte Änderungen" : "Deine Suche ist aktiv"}</strong></div>
-    <p class="hinweis" style="color:var(--text)">${esc(orteText(zustand.aktiveSuche))}<br>${esc(kurzKriterien(zustand.aktiveSuche))}</p>
-    <p class="hinweis">Neue Wohnungen kommen per E-Mail ${esc(versandText())}.</p>`;
-  $("speichern").disabled = !offen;
-  $("speichern").textContent = offen ? "Suche speichern" : "Gespeichert";
-  $("zuruecksetzen").hidden = !offen;
-  $("trennen").hidden = !tokenLesen();
+$("edSpeichern").onclick = async () => {
+  if (!emailHinzufuegen()) return;
+  const s = z.ed.s;
+  if (z.ed.entwurf) $("edEntwurfOk").click();
+  if (!s.orte.length) { meldung("Noch kein Gebiet", "Bitte gib unter Schritt 1 mindestens einen Ort ein oder tippe auf die Karte."); return; }
+  if (!(s.kategorien || []).length) { meldung("Objektart fehlt", "Bitte wähle unter Schritt 2 mindestens Wohnung, Haus oder WG-Zimmer."); return; }
+  s.name = (s.name || "").trim() || s.orte.map((o) => ortName(o.name)).join(", ");
+  try {
+    for (const a of z.ed.neueEmails) s.empfaenger.push({ maske: maskieren(a), geheim: await verschluesseln(a) });
+  } catch { meldung("Verschlüsselung fehlgeschlagen", "Die E-Mail-Adresse konnte nicht verschlüsselt werden. Bitte die Seite neu laden und nochmals versuchen."); return; }
+  z.ed.neueEmails = [];
+  speichern((l) => l.some((x) => x.id === s.id) ? l.map((x) => x.id === s.id ? s : x) : [...l, s], { titel: "Suche gespeichert", suche: s, lauf: true });
+};
+async function pausieren(s) {
+  const aktiv = s.aktiv === false;
+  speichern((l) => l.map((x) => x.id === s.id ? { ...x, aktiv } : x), { titel: aktiv ? "Suche fortgesetzt" : "Suche pausiert",
+    text: aktiv ? `«${esc(s.name)}» ist wieder aktiv; neue Wohnungen kommen wieder per E-Mail.` : `Für «${esc(s.name)}» kommen keine E-Mails mehr, bis du sie fortsetzt.`, lauf: aktiv });
 }
 
-const TOKEN = "immosuche.github.v1";
-const API = `https://api.github.com/repos/${REPO}`;
+// Verschlüsselung der Adressen mit dem öffentlichen Schlüssel des Suchlaufs (RSA-OAEP, SHA-256)
+async function verschluesseln(text) {
+  const pem = z.daten.schluessel.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("spki", der, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, new TextEncoder().encode(text)));
+  let b = ""; for (const x of ct) b += String.fromCharCode(x); return btoa(b);
+}
+
+// ---------- Speichern über GitHub ----------
+function yamlAlle(liste) {
+  const j = (x) => JSON.stringify(x ?? null);
+  const teile = liste.map((s) => {
+    const k = ["id", "name", "aktiv", "empfaenger", "angebot", "kategorien", "orte", ...FELDER, "merkmale_pflicht", "ausschluss_woerter"];
+    const orte = (s.orte || []).map((o) => ({ name: o.name, lat: o.lat, lon: o.lon, umkreis_km: o.umkreis_km }));
+    const w = { ...s, orte, aktiv: s.aktiv !== false };
+    return k.filter((f) => w[f] !== undefined).map((f, i) => `${i ? "    " : "  - "}${f}: ${j(w[f])}`).join("\n");
+  });
+  return `# Gespeichert über die Immosuche-Karte am ${new Date().toLocaleDateString("de-CH")}.\n# E-Mail-Adressen sind verschlüsselt; nur der Suchlauf kann sie lesen.\nsuchen:\n${teile.join("\n") || "  []"}\n`;
+}
 const tokenLesen = () => { try { return localStorage.getItem(TOKEN) || ""; } catch { return ""; } };
 const tokenSetzen = (t) => { try { t ? localStorage.setItem(TOKEN, t) : localStorage.removeItem(TOKEN); } catch {} };
 async function gh(pfad, opt = {}, token = tokenLesen()) {
@@ -495,78 +764,94 @@ async function gh(pfad, opt = {}, token = tokenLesen()) {
   return r.json();
 }
 function b64(txt) { let b = ""; for (const x of new TextEncoder().encode(txt)) b += String.fromCharCode(x); return btoa(b); }
-
 const dlg = $("dlg");
 function dialog(html) { $("dlgInhalt").innerHTML = html; if (!dlg.open) dlg.showModal(); }
 const dialogZu = () => dlg.close();
 dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
 function meldung(titel, text) {
-  dialog(`<h2>${titel}</h2><p class="gross" style="margin:0">${text}</p><div class="zeile" style="justify-content:flex-end"><button class="knopf" id="dlgOk">OK</button></div>`);
+  dialog(`<h2>${titel}</h2><p class="gross">${text}</p><div class="zeile rechts"><button class="knopf" id="dlgOk">OK</button></div>`);
   $("dlgOk").onclick = dialogZu;
 }
+$("trennen").onclick = () => { if (confirm("Den gespeicherten GitHub-Schlüssel aus diesem Browser entfernen?")) { tokenSetzen(""); $("trennen").hidden = true; } };
 
-$("speichern").onclick = () => tokenLesen() ? speichern() : verbindenDialog();
-$("trennen").onclick = () => { if (confirm("Den gespeicherten GitHub-Schlüssel aus diesem Browser entfernen?")) { tokenSetzen(""); statusZeigen(); } };
-
+let wartend = null;  // Speicherauftrag, der auf die Verbindung wartet
 function verbindenDialog(fehler = "") {
-  const url = `https://github.com/settings/personal-access-tokens/new?name=${encodeURIComponent("Immosuche Karte")}`
-    + `&description=${encodeURIComponent("Speichert Suchen von der Immosuche-Karte")}`;
+  const url = `https://github.com/settings/personal-access-tokens/new?name=${encodeURIComponent("Immosuche Karte")}&description=${encodeURIComponent("Speichert Suchen von der Immosuche-Karte")}`;
   dialog(`<h2>Einmalig mit GitHub verbinden</h2>
-    <p class="gross" style="margin:0">Damit die Karte deine Suche speichern darf, braucht sie einmalig einen Zugangsschlüssel. Danach speicherst du mit einem Klick.</p>
+    <p class="gross">Die Suchen werden in deinem GitHub-Repository gespeichert. Dafür braucht die Karte einmalig einen Zugangsschlüssel; danach speicherst du mit einem Klick.</p>
     <ol>
       <li><a href="${url}" target="_blank" rel="noopener"><b>Schlüssel auf GitHub erstellen</b></a> (öffnet einen neuen Tab)</li>
-      <li><b>Expiration:</b> «No expiration» oder ein spätes Datum wählen.</li>
-      <li><b>Repository access:</b> «Only select repositories», dann <b>immosuche</b> auswählen.</li>
-      <li><b>Permissions:</b> «Add permissions», <b>Contents</b> anhaken, rechts «Read and write» wählen.</li>
-      <li>Ganz unten <b>Generate token</b>, den Schlüssel (beginnt mit <code>github_pat_</code>) kopieren und hier einfügen:</li>
+      <li><b>Expiration:</b> «No expiration» oder ein spätes Datum.</li>
+      <li><b>Repository access:</b> «Only select repositories», dann <b>immosuche</b>.</li>
+      <li><b>Permissions:</b> «Add permissions», <b>Contents</b> anhaken, rechts «Read and write».</li>
+      <li>Unten <b>Generate token</b>, Schlüssel (beginnt mit <code>github_pat_</code>) kopieren und hier einfügen:</li>
     </ol>
     <input type="text" id="tokenFeld" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
-    ${fehler ? `<p class="fehler" style="margin:0">${esc(fehler)}</p>` : ""}
-    <p class="hinweis">Der Schlüssel bleibt nur in diesem Browser und erlaubt ausschliesslich Änderungen an diesem einen Repository.</p>
-    <div class="zeile" style="justify-content:flex-end"><button class="knopf leise" id="dlgAbbrechen">Abbrechen</button><button class="knopf" id="dlgVerbinden">Verbinden und speichern</button></div>`);
+    ${fehler ? `<p class="fehler">${esc(fehler)}</p>` : ""}
+    <p class="hinweis">Der Schlüssel bleibt nur in diesem Browser und erlaubt nur Änderungen an diesem einen Repository.</p>
+    <div class="zeile rechts"><button class="knopf leise" id="dlgAbbrechen">Abbrechen</button><button class="knopf" id="dlgVerbinden">Verbinden und speichern</button></div>`);
   $("dlgAbbrechen").onclick = dialogZu;
   $("dlgVerbinden").onclick = async () => {
-    const t = $("tokenFeld").value.trim();
-    if (!t) { $("tokenFeld").focus(); return; }
+    const t = $("tokenFeld").value.trim(); if (!t) { $("tokenFeld").focus(); return; }
     $("dlgVerbinden").disabled = true; $("dlgVerbinden").textContent = "Prüfe …";
-    try { await gh("", {}, t); tokenSetzen(t); speichern(); }
+    try { await gh("", {}, t); tokenSetzen(t); if (wartend) speichern(...wartend); }
     catch (e) { verbindenDialog(e.status === 401 ? "GitHub kennt diesen Schlüssel nicht. Bitte nochmals vollständig kopieren." : e.message); }
   };
 }
-
-async function speichern() {
-  if (!(zustand.suche.orte || []).length) { meldung("Noch kein Gebiet", "Bitte lege zuerst mindestens ein Gebiet an."); return; }
-  dialog(`<h2><span class="spinner"></span>Suche wird gespeichert …</h2>`);
+function yamlLesen(text) {   // liest das von yamlAlle geschriebene Format (jeder Wert ist JSON)
+  if (!/^suchen:/m.test(text)) return null;
+  const out = []; let cur = null;
+  for (const line of text.split("\n")) {
+    let m = line.match(/^  - (\w+): (.*)$/);
+    if (m) { cur = {}; out.push(cur); cur[m[1]] = JSON.parse(m[2]); continue; }
+    m = line.match(/^    (\w+): (.*)$/);
+    if (m && cur) cur[m[1]] = JSON.parse(m[2]);
+  }
+  return out;
+}
+async function speichern(aenderung, info) {
+  wartend = [aenderung, info];
+  if (!tokenLesen()) { verbindenDialog(); return; }
+  dialog(`<h2><span class="spinner"></span>Wird gespeichert …</h2>`);
   try {
-    let sha;
-    try { sha = (await gh("/contents/suche.yaml?ref=main")).sha; } catch (e) { if (e.status !== 404) throw e; }
+    let sha, basis = null;
+    try {
+      const f = await gh("/contents/suche.yaml?ref=main"); sha = f.sha;
+      try { basis = yamlLesen(new TextDecoder().decode(Uint8Array.from(atob(f.content.replace(/\s/g, "")), (c) => c.charCodeAt(0)))); } catch { basis = null; }
+    } catch (e) { if (e.status !== 404) throw e; }
+    // Grundlage ist der aktuelle Stand auf GitHub (die Seite kann veraltet sein); ältere Formate: Stand der Seite
+    const statistik = new Map(z.suchen.map((x) => [x.id, x]));
+    const liste = aenderung(kopie(basis || z.suchen.map((x) => { const { letzte_mail, letzte_mail_anzahl, neu, ...rest } = x; return rest; })));
     const res = await gh("/contents/suche.yaml", { method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "Suche über die Karte gespeichert", content: b64(yaml()), sha, branch: "main" }) });
-    zustand.aktiveSuche = kopie(zustand.suche);
-    try { localStorage.removeItem(ENTWURF); } catch {}
-    entwurf = null; formularFuellen();
-    bestaetigung(res.commit.sha);
+      body: JSON.stringify({ message: `${info.titel}: ${info.suche ? info.suche.name : ""}`.trim().replace(/:$/, ""), content: b64(yamlAlle(liste)), sha, branch: "main" }) });
+    wartend = null;
+    z.suchen = liste.map((x) => { const alt = statistik.get(x.id) || {};
+      return { ...x, letzte_mail: alt.letzte_mail, letzte_mail_anzahl: alt.letzte_mail_anzahl, neu: alt.neu }; });
+    $("trennen").hidden = false;
+    if (z.ed) { z.ed = null; tab("suchen"); }
+    suchenZeichnen(); suchFilterZeichnen(); kreiseZeichnen(); zeichnen();
+    bestaetigung(info, res.commit.sha);
   } catch (e) {
     if (e.status === 401) { tokenSetzen(""); verbindenDialog("Der gespeicherte Schlüssel ist abgelaufen oder ungültig. Bitte einen neuen erstellen."); }
     else if (e.status === 403 || e.status === 404) { tokenSetzen(""); verbindenDialog("Der Schlüssel darf dieses Repository nicht ändern. Bitte prüfen: Repository «immosuche» ausgewählt und bei Contents «Read and write»."); }
     else meldung("Speichern fehlgeschlagen", esc(e.message || "Unbekannter Fehler") + ". Bitte später nochmals versuchen.");
   }
 }
-
-function bestaetigung(commit) {
-  const s = zustand.aktiveSuche;
-  dialog(`<h2><span class="ok">✓</span>Suche gespeichert</h2>
-    <dl class="zusammenfassung">
+function bestaetigung(info, commit) {
+  const s = info.suche;
+  dialog(`<h2><span class="ok">✓</span>${esc(info.titel)}</h2>
+    ${s ? `<dl class="zusammenfassung">
+      <dt>Suche</dt><dd><b>${esc(s.name)}</b></dd>
       <dt>Gebiete</dt><dd>${esc(orteText(s))}</dd>
-      <dt>Suche</dt><dd>${esc(kurzKriterien(s))}</dd>
-      <dt>E-Mail</dt><dd>Sobald neue Wohnungen auftauchen, ${esc(versandText())}.</dd>
-    </dl>
-    <div class="fortschritt" id="lauf"><span class="spinner"></span><span>Der erste Suchlauf startet …</span></div>
-    <div class="zeile" style="justify-content:flex-end"><button class="knopf" id="dlgOk">Fertig</button></div>`);
+      <dt>Kriterien</dt><dd>${esc(kurzKriterien(s))}</dd>
+      <dt>E-Mail</dt><dd>Sobald neue Wohnungen auftauchen, täglich um ca. ${versandZeit()} Uhr an ${esc(empfText(s))}.</dd>
+    </dl>` : `<p class="gross">${info.text || ""}</p>`}
+    ${info.lauf ? `<div class="fortschritt" id="lauf"><span class="spinner"></span><span>Der Suchlauf startet …</span></div>` : ""}
+    <div class="zeile rechts"><button class="knopf" id="dlgOk">Fertig</button></div>`);
   $("dlgOk").onclick = dialogZu;
-  laufVerfolgen(commit);
+  if (info.lauf) laufVerfolgen(commit, s && s.id);
 }
-async function laufVerfolgen(commit) {
+async function laufVerfolgen(commit, sid) {
   const setze = (html, fertig) => { const el = $("lauf"); if (el) el.innerHTML = (fertig ? "" : '<span class="spinner"></span>') + `<span>${html}</span>`; };
   const start = Date.now();
   while (Date.now() - start < 8 * 60e3) {
@@ -577,140 +862,59 @@ async function laufVerfolgen(commit) {
     if (lauf.status !== "completed") { setze("Suchlauf läuft, das dauert etwa eine Minute …"); continue; }
     if (lauf.conclusion !== "success") { setze(`Der Suchlauf ist fehlgeschlagen. <a href="${esc(lauf.html_url)}" target="_blank" rel="noopener">Details auf GitHub</a>`, true); return; }
     try {
-      const r = await fetch(`${API}/contents/daten.json?ref=main`, { cache: "no-store",
-        headers: { Accept: "application/vnd.github.raw+json", Authorization: `Bearer ${tokenLesen()}` } });
-      const d = await r.json();
-      datenUebernehmen(d, true);
-      const l = (d.versand || {}).letzter_lauf || {};
-      setze(`Fertig: ${d.inserate.length} passende Wohnung${d.inserate.length === 1 ? "" : "en"} auf der Karte.`
-        + (l.mail ? ` ${l.neu} neue sind per E-Mail unterwegs.` : l.neu ? "" : " Keine neuen seit der letzten E-Mail."), true);
+      const r = await fetch(`${API}/contents/daten.json?ref=main`, { cache: "no-store", headers: { Accept: "application/vnd.github.raw+json", Authorization: `Bearer ${tokenLesen()}` } });
+      datenUebernehmen(await r.json());
+      const s = z.suchen.find((x) => x.id === sid);
+      const n = z.inserate.filter((w) => (w.su || []).includes(sid)).length;
+      setze(s ? `Fertig: ${n} passende Wohnung${n === 1 ? "" : "en"} gefunden.` + (s.neu && s.letzte_mail && alterTage(s.letzte_mail) === 0 ? ` Die E-Mail mit ${s.letzte_mail_anzahl} neuen ist unterwegs.` : n ? " Keine neuen seit der letzten E-Mail." : "") : "Fertig.", true);
     } catch { setze("Fertig. Lade die Seite in ein bis zwei Minuten neu, um die Ergebnisse zu sehen.", true); }
     return;
   }
   setze("Der Suchlauf braucht länger als üblich. Die Ergebnisse erscheinen später auf der Karte und per E-Mail.", true);
 }
 
-// ---------- Ortssuche im Reiter Wohnungen ----------
-function distanzKm(a, b) {
-  const r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r;
-  const h = Math.sin(dl / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) ** 2;
-  return 2 * 6371 * Math.asin(Math.sqrt(h));
-}
-const imSuchgebiet = (lat, lon) => (zustand.aktiveSuche.orte || []).some((o) => o.lat != null && distanzKm([o.lat, o.lon], [lat, lon]) <= o.umkreis_km);
-const inDerNaehe = (lat, lon, km = 2) => zustand.inserate.filter((w) => w.lat != null && distanzKm([w.lat, w.lon], [lat, lon]) <= km).length;
-let ortTimer, ortAnfrage = 0;
-function ortsvorschlaege(q) {
-  clearTimeout(ortTimer);
-  if (q.trim().length < 3) { $("ortbox").hidden = true; $("ortHinweis").hidden = true; return; }
-  const nr = ++ortAnfrage;
-  ortTimer = setTimeout(async () => {
-    try {
-      const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&origins=gg25,zipcode,gazetteer&sr=4326&limit=4&searchText=${encodeURIComponent(q)}`;
-      const t = (await (await fetch(u)).json()).results || [];
-      if (nr !== ortAnfrage) return;
-      const box = $("ortbox"); box.innerHTML = "";
-      const gesehen = new Set();
-      for (const r of t) {
-        const tmp = document.createElement("div"); tmp.innerHTML = r.attrs.label; const name = tmp.textContent.trim();
-        if (gesehen.has(name)) continue; gesehen.add(name);
-        const n = inDerNaehe(r.attrs.lat, r.attrs.lon);
-        const b = document.createElement("button"); b.className = "ortwahl";
-        b.innerHTML = `<span>📍 ${esc(name)}</span><small>${n ? `${n} Wohnung${n === 1 ? "" : "en"} in der Nähe` : "noch nicht in deiner Suche"}</small>`;
-        b.onclick = () => ortGewaehlt(name, r.attrs.lat, r.attrs.lon);
-        box.appendChild(b);
-      }
-      box.hidden = !box.children.length;
-    } catch { $("ortbox").hidden = true; }
-  }, 250);
-}
-function ortGewaehlt(name, lat, lon) {
-  $("ortbox").hidden = true;
-  $("text").value = ""; zustand.text = ""; zustand.sichtbar = 100; zeichnen();
-  karte.flyTo([lat, lon], 14, { duration: .8 });
-  const kurzname = name.replace(/\s*\(.*\)$/, "").replace(/^\d{4}\s+/, "");
-  const box = $("ortHinweis");
-  if (imSuchgebiet(lat, lon) && inDerNaehe(lat, lon)) { box.hidden = true; return; }
-  box.innerHTML = imSuchgebiet(lat, lon)
-    ? `<div><strong>Zurzeit keine passenden Wohnungen in ${esc(kurzname)}.</strong><br><span class="hinweis">Der Ort liegt in deinem Suchgebiet; neue Inserate kommen automatisch per E-Mail.</span></div>`
-    : `<div><strong>${esc(kurzname)} ist noch nicht in deiner Suche.</strong><br><span class="hinweis">Füge den Ort als Suchgebiet hinzu; danach erscheinen die Wohnungen hier und neue kommen per E-Mail.</span></div>
-       <button class="knopf" id="ortDazu">${esc(kurzname)} zur Suche hinzufügen</button>`;
-  box.hidden = false;
-  const dazu = $("ortDazu");
-  if (dazu) dazu.onclick = () => {
-    (zustand.suche.orte ||= []).push({ name: kurzname, lat: +(+lat).toFixed(6), lon: +(+lon).toFixed(6), umkreis_km: 3 });
-    box.hidden = true; geaendert(); tab("suche");
-  };
-}
-
-// Ortssuche über geo.admin.ch
-let suchTimer;
-$("adresse").addEventListener("input", () => {
-  clearTimeout(suchTimer);
-  const q = $("adresse").value.trim();
-  if (q.length < 3) { $("vorschlaege").hidden = true; return; }
-  suchTimer = setTimeout(async () => {
-    try {
-      const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&sr=4326&limit=6&searchText=${encodeURIComponent(q)}`;
-      const t = (await (await fetch(u)).json()).results || [];
-      const box = $("vorschlaege"); box.innerHTML = "";
-      for (const r of t) {
-        const b = document.createElement("button");
-        b.innerHTML = r.attrs.label; // vom Bund geliefert, enthält nur <b>
-        b.textContent = b.textContent;
-        b.onclick = () => { $("adresse").value = b.textContent; box.hidden = true; entwurfSetzen(r.attrs.lat, r.attrs.lon);
-          if (!$("kreisName").value) $("kreisName").value = b.textContent.replace(/\s*\(.*\)$/, "").split(" ").slice(0, 3).join(" "); };
-        box.appendChild(b);
-      }
-      box.hidden = !t.length;
-    } catch { $("vorschlaege").hidden = true; }
-  }, 250);
-});
-
-// ---------- Bedienelemente ----------
-let aktuellerTab = "liste";
+// ---------- Reiter und Filter ----------
 function tab(name) {
-  aktuellerTab = name;
-  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name));
-  $("tab-liste").hidden = name !== "liste"; $("tab-suche").hidden = name !== "suche";
-  karte.getContainer().style.cursor = name === "suche" ? "crosshair" : "";
-  if (name === "suche") { const b = gebietEbene.getLayers().filter((l) => l.getBounds).map((l) => l.getBounds());
-    if (b.length) karte.fitBounds(b.reduce((a, c) => a.extend(c)), { padding: [30, 30] }); }
+  z.tab = name;
+  const reiter = name === "editor" ? "suchen" : name;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === reiter));
+  for (const t of ["suchen", "editor", "wohnungen", "quellen"]) $("tab-" + t).hidden = t !== name;
+  $("kartenhinweis").hidden = name !== "editor";
+  karte.getContainer().style.cursor = name === "editor" ? "crosshair" : "";
+  if (name !== "wohnungen") $("ortHinweis").hidden = true;
 }
-document.querySelectorAll("nav.tabs button").forEach((b) => b.onclick = () => tab(b.dataset.tab));
-const neuFiltern = () => { zustand.sichtbar = 100; zeichnen(true); };
-$("seit").onchange = () => { zustand.seit = +$("seit").value; neuFiltern(); };
-$("zimmer").onchange = () => { zustand.zimmer = +$("zimmer").value; neuFiltern(); };
-$("sortierung").onchange = () => { zustand.sortierung = $("sortierung").value; zustand.sichtbar = 100; zeichnen(); };
-let preisStufen = [];
+document.querySelectorAll("nav.tabs button").forEach((b) => b.onclick = () => {
+  if (z.ed) { if (edUngespeichert() && !confirm("Änderungen an der Suche verwerfen?")) return; z.ed = null; kreiseZeichnen(); zeichnen(); }
+  tab(b.dataset.tab);
+  if (b.dataset.tab === "suchen") { z.filterSuche = null; kreiseZeichnen(); }
+  if (b.dataset.tab === "wohnungen") zeichnen(true);
+});
+const neuFiltern = () => { z.sichtbar = 100; zeichnen(true); };
+$("seit").onchange = () => { z.seit = +$("seit").value; neuFiltern(); };
+$("zimmer").onchange = () => { z.zimmer = +$("zimmer").value; neuFiltern(); };
+$("sortierung").onchange = () => { z.sortierung = $("sortierung").value; z.sichtbar = 100; zeichnen(); };
+let preisStufen = [], tippTimer;
 $("preis").addEventListener("input", () => {
   const v = +$("preis").value;
-  zustand.preisMax = v >= preisStufen.length - 1 ? null : preisStufen[v];
-  $("preisWert").textContent = zustand.preisMax == null ? "alle" : chf(zustand.preisMax);
+  z.preisMax = v >= preisStufen.length - 1 ? null : preisStufen[v];
+  $("preisWert").textContent = z.preisMax == null ? "alle" : chf(z.preisMax);
   clearTimeout(tippTimer); tippTimer = setTimeout(neuFiltern, 120);
 });
-let tippTimer;
 $("text").addEventListener("input", () => {
-  clearTimeout(tippTimer); tippTimer = setTimeout(() => { zustand.text = $("text").value; neuFiltern(); }, 200);
+  clearTimeout(tippTimer); tippTimer = setTimeout(() => { z.text = $("text").value; neuFiltern(); }, 200);
   $("ortHinweis").hidden = true; ortsvorschlaege($("text").value);
 });
-$("mehr").onclick = () => { zustand.sichtbar += 100; zeichnen(); };
+$("mehr").onclick = () => { z.sichtbar += 100; zeichnen(); };
 
 // ---------- Start ----------
-function datenUebernehmen(d, aktualisierung = false) {
-  zustand.inserate = d.inserate || [];
-  zustand.versand = d.versand || {};
-  zustand.alleQuellen = [...new Set(zustand.inserate.map((w) => w.q))].sort();
-  zustand.quellen = new Set(zustand.alleQuellen);
-  const box = $("quellen"); box.innerHTML = "";
-  for (const q of zustand.alleQuellen) {
-    const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
-    b.textContent = `${q} (${zustand.inserate.filter((w) => w.q === q).length})`;
-    b.onclick = () => { zustand.quellen.has(q) ? zustand.quellen.delete(q) : zustand.quellen.add(q); b.setAttribute("aria-pressed", zustand.quellen.has(q)); neuFiltern(); };
-    box.appendChild(b);
-  }
-  // Preisregler in sinnvollen Stufen zwischen kleinstem und grösstem Preis
-  preisStufen = []; zustand.preisMax = null; $("preisWert").textContent = "alle";
-  const preise = zustand.inserate.map((w) => w.p).filter(Boolean).sort((a, b) => a - b);
+function datenUebernehmen(d) {
+  z.daten = d;
+  z.inserate = d.inserate || [];
+  z.suchen = (d.suchen || []).map((s) => ({ ...s.kriterien, id: s.id, name: s.name, aktiv: s.aktiv,
+    letzte_mail: s.letzte_mail, letzte_mail_anzahl: s.letzte_mail_anzahl, neu: s.neu }));
+  z.quellen = new Set(z.inserate.map((w) => w.q));
+  preisStufen = []; z.preisMax = null; $("preisWert").textContent = "alle";
+  const preise = z.inserate.map((w) => w.p).filter(Boolean).sort((a, b) => a - b);
   if (preise.length) {
     const lo = Math.floor(preise[0] / 100) * 100, hi = Math.ceil(preise.at(-1) / 100) * 100;
     const schritt = hi - lo > 20000 ? 10000 : hi - lo > 3000 ? 100 : 50;
@@ -719,15 +923,23 @@ function datenUebernehmen(d, aktualisierung = false) {
     $("preis").max = preisStufen.length - 1; $("preis").value = preisStufen.length - 1;
   }
   const s = new Date(d.stand);
-  $("stand").textContent = `${zustand.inserate.length} Inserate aus ${zustand.alleQuellen.length || 0} Quelle${zustand.alleQuellen.length === 1 ? "" : "n"} · Stand ${s.toLocaleDateString("de-CH")} ${s.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
-  if (!aktualisierung) {   // nach dem Speichern gilt die eben gespeicherte Suche als aktiv
-    zustand.aktiveSuche = d.kriterien || { angebot: "RENT", kategorien: ["APARTMENT"], orte: [] };
-    zustand.suche = ladeEntwurf() || kopie(zustand.aktiveSuche);
-  }
-  formularFuellen(); zeichnen(!aktualisierung || aktuellerTab === "liste");
+  $("stand").textContent = `Letzter Suchlauf ${vorTagen(d.stand)} ${s.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })} · danach täglich um ca. ${versandZeit()} Uhr`;
+  $("zWohnungen").textContent = z.inserate.length || "";
+  $("trennen").hidden = !tokenLesen();
+  suchenZeichnen(); quellenZeichnen(); suchFilterZeichnen(); kreiseZeichnen(); zeichnen();
 }
-fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => datenUebernehmen(d))
-.catch(() => { $("stand").textContent = "Daten konnten nicht geladen werden."; });
+fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+  if (!d.suchen) {  // ältere Kartendaten: einzelne Suche nachbilden
+    d.suchen = d.kriterien ? [{ id: "standard", name: (d.kriterien.orte || []).map((o) => ortName(o.name)).join(", ") || "Meine Suche", aktiv: true,
+      empfaenger: (d.versand || {}).an || [], kriterien: { ...d.kriterien, id: "standard", empfaenger: [] } }] : [];
+    d.standard_empfaenger = (d.versand || {}).an || []; d.quellen = d.quellen || []; d.postfach = d.postfach || {};
+    for (const w of d.inserate || []) w.su = ["standard"];
+  }
+  datenUebernehmen(d);
+  const sid = new URLSearchParams(location.search).get("suche");
+  if (sid && z.suchen.some((s) => s.id === sid)) { z.filterSuche = sid; tab("wohnungen"); suchFilterZeichnen(); kreiseZeichnen(); zeichnen(true); }
+  else aufGebiete(z.suchen.filter((s) => s.aktiv !== false).flatMap((s) => s.orte || []));
+}).catch((e) => { console.error(e); $("stand").textContent = "Daten konnten nicht geladen werden."; });
 </script>
 </body>
 </html>

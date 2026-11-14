@@ -34,16 +34,17 @@ def _place(l: Listing) -> str:
     return ", ".join(x for x in (l.street, f"{l.zipcode} {l.city}".strip()) if x)
 
 
-def render(listings: list[Listing], also_on: dict[str, list[Listing]], karte: str = "") -> tuple[str, str]:
+def render(listings: list[Listing], also_on: dict[str, list[Listing]], karte: str = "", titel: str = "") -> tuple[str, str]:
+    kopf = f"{len(listings)} neue Wohnung{'' if len(listings) == 1 else 'en'}" + (f" für «{titel}»" if titel else "")
     groups: dict[str, list[Listing]] = defaultdict(list)
     for l in listings:
         groups[l.source].append(l)
 
     h = ['<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:680px;color:#1d1d1f">',
-         f'<h2 style="margin:0 0 4px">{len(listings)} neue Treffer</h2>',
+         f'<h2 style="margin:0 0 4px">{html.escape(kopf)}</h2>',
          f'<p style="margin:0 0 20px;color:#666">Quellen: {", ".join(sorted(groups))}'
          + (f' · <a href="{html.escape(karte)}" style="color:#0a58ca">Alle auf der Karte</a>' if karte else "") + '</p>']
-    t = [f"{len(listings)} neue Treffer\n"]
+    t = [kopf + "\n"]
     for src in sorted(groups):
         h.append(f'<h3 style="border-bottom:1px solid #ddd;padding-bottom:4px;margin:24px 0 8px">{html.escape(src)}</h3>')
         t.append(f"\n== {src} ==")

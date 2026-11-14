@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import email
+import email.utils
 import imaplib
 import logging
 import re
@@ -173,12 +174,14 @@ def _html_of(msg) -> str:
     return re.sub(r"(https?://\S+)", r'<a href="\1">\1</a>', plain.replace("\n", "<br>\n"))
 
 
-def fetch(cfg: dict, host: str, user: str, password: str, processed: set[str]) -> tuple[list[Listing], set[str]]:
-    """Liefert (Inserate, neu verarbeitete Message-IDs)."""
+def fetch(cfg: dict, host: str, user: str, password: str, processed: set[str]
+          ) -> tuple[list[Listing], set[str], dict[str, dict]]:
+    """Liefert (Inserate, neu verarbeitete Message-IDs, Statistik je Portal-Domain)."""
     since = (date.today() - timedelta(days=int(cfg.get("tage_zurueck", 3)))).strftime("%d-%b-%Y")
     resolver = RedirectResolver()
     listings: list[Listing] = []
     done: set[str] = set()
+    stats: dict[str, dict] = {}
     with imaplib.IMAP4_SSL(host) as M:
         M.login(user, password)
         M.select(f'"{cfg.get("ordner", "INBOX")}"', readonly=True)
@@ -200,4 +203,16 @@ def fetch(cfg: dict, host: str, user: str, password: str, processed: set[str]) -
             log.info("Mail '%s': %d Inserate", subj[:70], len(items))
             listings.extend(items)
             done.add(mid)
-    return listings, done
+            absender = email.utils.parseaddr(msg.get("From", ""))[1].split("@")[-1]
+            dom = portal_of(absender)
+            if dom:
+                try:
+                    zeit = email.utils.parsedate_to_datetime(msg.get("Date")).timestamp()
+                except Exception:
+                    zeit = None
+                s = stats.setdefault(dom, {"mails": 0, "inserate": 0, "letzte_mail": None})
+                s["mails"] += 1
+                s["inserate"] += len(items)
+                if zeit and (s["letzte_mail"] is None or zeit > s["letzte_mail"]):
+                    s["letzte_mail"] = zeit
+    return listings, done, stats

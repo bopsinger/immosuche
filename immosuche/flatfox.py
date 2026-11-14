@@ -131,7 +131,7 @@ def search(crit: dict, rejected_before: set[str]) -> tuple[list[Listing], set[st
     """
     s = requests.Session()
     s.headers.update(HEADERS)
-    params = {"offer_type": crit.get("angebot", "RENT")}
+    params = {"offer_type": crit.get("angebot") or "RENT"}
     if crit.get("preis_min") is not None:
         params["min_price"] = crit["preis_min"]
     if crit.get("preis_max") is not None:

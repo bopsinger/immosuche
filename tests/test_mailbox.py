@@ -42,3 +42,35 @@ def test_cross_portal_dedupe():
 
 def test_clean_url():
     assert clean_url("https://x.ch/a?utm_source=1&id=5#f") == "https://x.ch/a?id=5"
+
+
+def test_schluessel_roundtrip(tmp_path):
+    from immosuche import schluessel
+    priv, pem = schluessel.laden_oder_erzeugen(tmp_path, "geheim")
+    ct = schluessel.verschluesseln(pem, "a@b.ch")
+    priv2, pem2 = schluessel.laden_oder_erzeugen(tmp_path, "geheim")   # erneut laden statt neu erzeugen
+    assert pem2 == pem and schluessel.entschluesseln(priv2, ct) == "a@b.ch"
+    priv3, pem3 = schluessel.laden_oder_erzeugen(tmp_path, "anderes")  # Passwort geändert -> neuer Schlüssel
+    assert pem3 != pem and schluessel.entschluesseln(priv3, ct) is None
+
+
+def test_alte_konfiguration_und_zustand(tmp_path):
+    import json
+    from immosuche.__main__ import load_config, load_state
+    (tmp_path / "config.yaml").write_text("suche:\n  orte: [{name: 'Ort Thalwil (ZH)', umkreis_km: 5}]\n")
+    cfg, suchen, quelle = load_config(tmp_path, None)
+    assert suchen[0]["id"] == "standard" and suchen[0]["name"] == "Thalwil" and suchen[0]["aktiv"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"gemeldet": {"flatfox:1": 5}, "verworfen": ["flatfox:2"], "kriterien": "h"}))
+    st = load_state(p, "standard")
+    assert st["gemeldet"] == {"standard|flatfox:1": 5}
+    assert st["verworfen"] == {"standard": {"hash": "h", "ids": ["flatfox:2"]}}
+
+
+def test_empfaenger(tmp_path):
+    from immosuche import schluessel
+    from immosuche.__main__ import empfaenger_von
+    priv, pem = schluessel.laden_oder_erzeugen(tmp_path, "x")
+    s = {"id": "a", "empfaenger": [{"maske": "a•••@b•••.ch", "geheim": schluessel.verschluesseln(pem, "anna@beispiel.ch")}]}
+    assert empfaenger_von(s, priv, ["std@x.ch"]) == (["anna@beispiel.ch"], ["a•••@b•••.ch"])
+    assert empfaenger_von({"id": "b", "empfaenger": []}, priv, ["std@x.ch"]) == (["std@x.ch"], ["s•••@x•••.ch"])
