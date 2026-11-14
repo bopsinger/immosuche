@@ -14,6 +14,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -30,12 +31,13 @@ KEEP_DAYS = 180
 POSTFACH_TAGE = 21          # Inserate aus Portal-Mails so lange auf der Karte zeigen
 STANDARD_ID = "standard"    # Kennung der Suche aus der alten Einzel-Konfiguration
 META = ("id", "name", "aktiv", "empfaenger")   # Felder einer Suche, die keine Suchkriterien sind
-PORTALE = {  # Portale, die über Suchabos ins Sammelpostfach eingebunden werden
+PORTALE = {  # Portale, die über Suchabos ins Sammelpostfach eingebunden werden (Comparis genügt)
+    "comparis.ch": ("Comparis", "https://www.comparis.ch/immobilien"),
     "homegate.ch": ("Homegate", "https://www.homegate.ch"),
     "immoscout24.ch": ("ImmoScout24", "https://www.immoscout24.ch"),
     "newhome.ch": ("Newhome", "https://www.newhome.ch"),
-    "comparis.ch": ("Comparis", "https://www.comparis.ch/immobilien"),
 }
+PFLICHT = {"flatfox", "comparis.ch"}
 
 
 def ts_iso(ts: float | None) -> str | None:
@@ -162,14 +164,21 @@ def dedupe(items: list[Listing], st: dict, sid: str = STANDARD_ID) -> tuple[list
     return group(fresh)
 
 
-def postfach_passt(l: Listing, crit: dict, einzige_suche: bool) -> bool:
-    """Ordnet ein Inserat aus einer Portal-Mail einer Suche zu (Lage, Preis, Zimmer, sofern bekannt)."""
-    if l.lat is not None and not einzige_suche:
+def postfach_passt(l: Listing, crit: dict) -> bool:
+    """Prüft ein Inserat aus einer (bewusst breiten) Portal-Abo-Mail gegen die Suche: Lage, Preis, Zimmer,
+    Fläche und Ausschlusswörter, soweit die Mail sie angibt. Die Lage ist oft nur der Mittelpunkt der
+    Postleitzahl, daher etwas Spielraum."""
+    if l.lat is not None:
+        spiel = 1.5 if l.approx else 0.3
         if not any(o.get("lat") is not None and
-                   flatfox.distance_km(o["lat"], o["lon"], l.lat, l.lon) <= float(o.get("umkreis_km", 3)) + 1
+                   flatfox.distance_km(o["lat"], o["lon"], l.lat, l.lon) <= float(o.get("umkreis_km", 3)) + spiel
                    for o in crit.get("orte") or []):
             return False
-    for wert, lo, hi in ((l.price, "preis_min", "preis_max"), (l.rooms, "zimmer_min", "zimmer_max")):
+    titel = (l.title or "").lower()
+    if any(re.search(r"(?<!\w)" + re.escape(w.lower()), titel) for w in crit.get("ausschluss_woerter") or []):
+        return False
+    for wert, lo, hi in ((l.price, "preis_min", "preis_max"), (l.rooms, "zimmer_min", "zimmer_max"),
+                         (l.area, "flaeche_min", "flaeche_max")):
         if wert is not None and ((crit.get(lo) is not None and wert < crit[lo]) or
                                  (crit.get(hi) is not None and wert > crit[hi])):
             return False
@@ -279,7 +288,7 @@ def main() -> int:
                 log.exception("Flatfox fehlgeschlagen")
                 errors.append(f"Flatfox: {e}")
         st["verworfen"][sid] = vw
-        aktuell += [l for l in postfach if postfach_passt(l, crit, len(aktive) == 1)]
+        aktuell += [l for l in postfach if postfach_passt(l, crit)]
 
         new, also_new = dedupe(aktuell, st, sid)
         log.info("Suche «%s»: %d passend, %d neu", suche["name"], len(aktuell), len(new))
@@ -336,12 +345,12 @@ def main() -> int:
         st["mails"][m] = jetzt
     ps = st["postfach_status"]
     quellen = [{"id": "flatfox", "name": "Flatfox", "art": "direkt", "link": "https://flatfox.ch", "ok": True,
-                "inserate": flatfox_anzahl}]
+                "inserate": flatfox_anzahl, "pflicht": True}]
     for dom, (name, link) in PORTALE.items():
         p = st["portale"].get(dom) or {}
         quellen.append({"id": dom, "name": name, "art": "suchabo", "link": link, "ok": bool(p.get("mails")),
                         "letzte_mail": ts_iso(p.get("letzte_mail")), "mails": p.get("mails", 0),
-                        "inserate_gesamt": p.get("inserate", 0)})
+                        "inserate_gesamt": p.get("inserate", 0), "pflicht": dom in PFLICHT})
     daten = {
         "stand": ts_iso(jetzt), "quelle": quelle, "zeit": os.environ.get("VERSAND_ZEIT", "06:17"),
         "standard_empfaenger": [maskieren(a) for a in standard],

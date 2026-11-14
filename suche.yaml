@@ -2,32 +2,17 @@
 # E-Mail-Adressen sind verschlüsselt; nur der Suchlauf kann sie lesen.
 suchen:
   - id: "standard"
-    name: "Thalwil"
+    name: "Linkes Zürichseeufer"
     aktiv: true
     empfaenger: []
     angebot: "RENT"
     kategorien: ["APARTMENT"]
-    orte: [{"name":"Ort Thalwil (ZH)","lat":47.291458,"lon":8.563276,"umkreis_km":5}]
+    orte: [{"name":"Zürich-Wollishofen","lat":47.34813,"lon":8.53332,"umkreis_km":2},{"name":"Kilchberg","lat":47.3242,"lon":8.54846,"umkreis_km":2},{"name":"Rüschlikon","lat":47.30818,"lon":8.5536,"umkreis_km":2},{"name":"Thalwil","lat":47.29591,"lon":8.56512,"umkreis_km":2},{"name":"Oberrieden","lat":47.2792,"lon":8.5793,"umkreis_km":2},{"name":"Horgen","lat":47.26155,"lon":8.59598,"umkreis_km":2.5},{"name":"Au ZH","lat":47.24651,"lon":8.64431,"umkreis_km":2.5},{"name":"Wädenswil","lat":47.22919,"lon":8.67487,"umkreis_km":2.5}]
     preis_min: 1000
     preis_max: 3000
     zimmer_min: 2.5
     zimmer_max: null
     flaeche_min: 30
-    flaeche_max: null
-    merkmale_pflicht: []
-    ausschluss_woerter: ["befristet","Untermiete","möbliert","WG-Zimmer","Mitbewohn","Zwischenmiete","temporary","temporär","furnished","sublet","shared flat"]
-  - id: "v9dffa"
-    name: "thalwil 3 zimmer"
-    aktiv: true
-    empfaenger: []
-    angebot: "RENT"
-    kategorien: ["APARTMENT"]
-    orte: [{"name":"Thalwil","lat":47.287445,"lon":8.560399,"umkreis_km":3}]
-    preis_min: 1000
-    preis_max: 3000
-    zimmer_min: null
-    zimmer_max: null
-    flaeche_min: null
     flaeche_max: null
     merkmale_pflicht: []
     ausschluss_woerter: ["befristet","Untermiete","möbliert","WG-Zimmer","Mitbewohn","Zwischenmiete","temporary","temporär","furnished","sublet","shared flat"]

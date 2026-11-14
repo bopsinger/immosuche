@@ -498,12 +498,13 @@ function ortGewaehlt(r) {
 // ---------- Suchen: Übersicht ----------
 function suchenZeichnen() {
   const box = $("suchenListe"), d = z.daten || {};
-  const qs = d.quellen || [], verbunden = qs.filter((q) => q.ok).length;
+  const qs = d.quellen || [], fehlend = qs.filter((q) => q.pflicht && !q.ok);
   box.innerHTML = `
     <button class="knopf breit" id="neueSuche">+ Neue Suche</button>
-    <div class="quellenleiste ${verbunden < qs.length ? "warn" : ""}" id="zuQuellen">
-      <span>${verbunden < qs.length ? "⚠" : "✓"}</span>
-      <span><b>${verbunden} von ${qs.length} Quellen verbunden</b><br><span class="hinweis">${esc(qs.map((q) => (q.ok ? "✓ " : "○ ") + q.name).join("   "))}</span></span>
+    <div class="quellenleiste ${fehlend.length ? "warn" : ""}" id="zuQuellen">
+      <span>${fehlend.length ? "⚠" : "✓"}</span>
+      <span>${fehlend.length ? `<b>${esc(fehlend.map((q) => q.name).join(", "))} noch nicht eingerichtet</b><br><span class="hinweis">Einmalig, etwa 3 Minuten. Erst dann kommen Homegate, ImmoScout24 und weitere Portale dazu.</span>`
+        : `<b>Alle nötigen Quellen verbunden</b><br><span class="hinweis">${esc(qs.filter((q) => q.ok).map((q) => q.name).join(", "))}</span>`}</span>
       <span class="pfeil">›</span></div>`;
   if (!z.suchen.length) box.insertAdjacentHTML("beforeend", `<div class="leer"><strong>Noch keine Suche</strong><span>Lege deine erste Suche an: Gebiet wählen, Budget festlegen, E-Mail-Adresse eintragen. Fertig.</span></div>`);
   for (const s of z.suchen) {
@@ -537,41 +538,72 @@ function suchenZeichnen() {
 }
 
 // ---------- Quellen ----------
+// Vorschlag für das breite Portal-Abo: ein Ort mit Umkreis, der alle aktiven Suchgebiete abdeckt
+function aboVorschlag() {
+  const orte = z.suchen.filter((s) => s.aktiv !== false).flatMap((s) => s.orte || []).filter((o) => o.lat != null);
+  if (!orte.length) return null;
+  let best = null;
+  for (const m of orte) {
+    const r = Math.max(...orte.map((o) => distanzKm([m.lat, m.lon], [o.lat, o.lon]) + o.umkreis_km));
+    if (!best || r < best.r) best = { name: ortName(m.name), r };
+  }
+  const stufen = [5, 10, 15, 20, 25, 30, 40, 50];
+  best.stufe = stufen.find((x) => x >= best.r - 1) || Math.ceil(best.r);
+  return best;
+}
+function quellenStatus(q) {
+  if (q.art === "direkt") return { sym: "gruen", pill: `<span class="pill gruen">Verbunden</span>`, unter: `Direkt angebunden · ${q.inserate || 0} passende Inserate im letzten Lauf` };
+  if (!q.ok) return { sym: q.pflicht ? "orange" : "grau", pill: `<span class="pill ${q.pflicht ? "orange" : "grau"}">Nicht eingerichtet</span>`, unter: "Noch keine Suchabo-Mail im Sammelpostfach angekommen." };
+  const alt = q.letzte_mail ? alterTage(q.letzte_mail) : 99;
+  return { sym: alt > 7 ? "orange" : "gruen", pill: alt > 7 ? `<span class="pill orange">Keine Mails seit ${alt} Tagen</span>` : `<span class="pill gruen">Verbunden</span>`,
+    unter: `Letzte Abo-Mail ${q.letzte_mail ? vorTagen(q.letzte_mail) : "unbekannt"} · ${q.mails} Mail${q.mails === 1 ? "" : "s"}, ${q.inserate_gesamt} Inserate bisher` };
+}
 function quellenZeichnen() {
   const d = z.daten || {}, p = d.postfach || {}, qs = d.quellen || [];
-  const verbunden = qs.filter((q) => q.ok).length;
-  $("zQuellen").textContent = `${verbunden}/${qs.length}`;
-  $("zQuellen").className = "zahl" + (verbunden < qs.length ? " warn" : "");
-  const adr = p.adresse ? `<code class="adr">${esc(p.adresse)}</code>` : "deine Sammel-Gmail-Adresse";
-  let html = `<p class="hinweis" style="font-size:13px">Flatfox wird direkt abgefragt. Homegate, ImmoScout24, Newhome und Comparis sperren automatische Abfragen; sie liefern ihre Inserate über <b>Suchabos</b>, die an dein Sammelpostfach gehen. Bei jedem Suchlauf wird geprüft, welche Portale Mails geschickt haben.</p>`;
-  for (const q of qs) {
-    let sym, pill, unter;
-    if (q.art === "direkt") { sym = "gruen"; pill = `<span class="pill gruen">Verbunden</span>`; unter = `Direkt angebunden · ${q.inserate || 0} passende Inserate im letzten Lauf`; }
-    else if (!q.ok) { sym = "grau"; pill = `<span class="pill grau">Nicht eingerichtet</span>`; unter = "Noch keine Suchabo-Mail im Sammelpostfach angekommen."; }
-    else {
-      const alt = q.letzte_mail ? alterTage(q.letzte_mail) : 99;
-      sym = alt > 7 ? "orange" : "gruen";
-      pill = alt > 7 ? `<span class="pill orange">Keine Mails seit ${alt} Tagen</span>` : `<span class="pill gruen">Verbunden</span>`;
-      unter = `Letzte Abo-Mail ${q.letzte_mail ? vorTagen(q.letzte_mail) : "unbekannt"} · ${q.mails} Mail${q.mails === 1 ? "" : "s"}, ${q.inserate_gesamt} Inserate bisher`;
-    }
-    html += `<div class="karteikarte"><div class="quelle"><span class="sym ${sym}">${esc(q.name[0])}</span><strong>${esc(q.name)}</strong>${pill}
-      <span class="unter">${esc(unter)}</span>
-      ${q.art === "suchabo" ? `<button class="link" data-anl="${esc(q.id)}" style="grid-column:2/4;justify-self:start">${z.offeneAnleitung === q.id ? "Anleitung ausblenden" : q.ok ? "Anleitung anzeigen" : "So richtest du das Suchabo ein"}</button>
-      <div class="anleitung" ${z.offeneAnleitung === q.id ? "" : "hidden"}><ol>
-        <li><a href="${esc(q.link)}" target="_blank" rel="noopener"><b>${esc(q.name)}</b> öffnen</a> und dieselbe Suche eingeben wie hier (Ort, Umkreis, Preis, Zimmer).</li>
-        <li>Bei den Ergebnissen <b>«Suchabo»</b>, <b>«Suche speichern»</b> oder die <b>Glocke</b> anklicken.</li>
-        <li>Konto mit ${adr} anlegen bzw. dich damit anmelden (nicht mit deiner privaten Adresse).</li>
-        <li>Häufigkeit <b>täglich</b> oder <b>sofort</b> wählen.</li>
-        <li>Im Sammelpostfach die Bestätigungsmail von ${esc(q.name)} öffnen und den Link anklicken.</li>
-      </ol><p class="hinweis" style="margin-top:6px">Sobald die erste Abo-Mail eingetroffen ist, steht hier «Verbunden» (nach dem nächsten Suchlauf).</p></div>` : ""}
-    </div></div>`;
+  const fehlend = qs.filter((q) => q.pflicht && !q.ok);
+  $("zQuellen").textContent = fehlend.length ? "!" : "✓";
+  $("zQuellen").className = "zahl" + (fehlend.length ? " warn" : "");
+  const adr = p.adresse ? `<code class="adr">${esc(p.adresse)}</code> (deine Sammel-Gmail)` : "deine Sammel-Gmail-Adresse";
+  const v = aboVorschlag();
+  const karte = (q, inhalt) => { const st = quellenStatus(q);
+    return `<div class="karteikarte"><div class="quelle"><span class="sym ${st.sym}">${esc(q.name[0])}</span><strong>${esc(q.name)}</strong>${st.pill}
+      <span class="unter">${esc(st.unter)}</span>${inhalt || ""}</div></div>`; };
+  const anleitung = (q, html, offenStandard) => {
+    const offen = z.offeneAnleitung === q.id || (z.offeneAnleitung == null && offenStandard);
+    return `<button class="link" data-anl="${esc(q.id)}" data-offen="${offen}" style="grid-column:2/4;justify-self:start">${offen ? "Anleitung ausblenden" : q.ok ? "Anleitung anzeigen" : "So richtest du es ein"}</button>
+      <div class="anleitung" ${offen ? "" : "hidden"}>${html}</div>`;
+  };
+  let html = `<div class="karteikarte" style="background:var(--accent-soft);border-color:transparent;box-shadow:none">
+    <strong>So funktioniert es</strong>
+    <p class="hinweis" style="color:var(--text);font-size:13px">Flatfox fragt die App direkt ab. Alle anderen Portale kommen über <b>ein einziges, bewusst breites Comparis-Suchabo</b>, das du einmalig einrichtest. Comparis bündelt die bekannten Schweizer Portale. Orte, Preis, Zimmer und Empfänger stellst du danach <b>nur noch hier in der App</b> ein; die App filtert die Abo-Mails und schickt dir eine Mail pro Tag ohne Doppler.</p></div>
+    <h3 style="margin:4px 0 0;font-size:13px;color:var(--muted)">NÖTIG</h3>`;
+  for (const q of qs.filter((q) => q.pflicht)) {
+    if (q.id !== "comparis.ch") { html += karte(q); continue; }
+    html += karte(q, anleitung(q, `<ol>
+        <li><a href="${esc(q.link)}" target="_blank" rel="noopener"><b>comparis.ch/immobilien</b> öffnen</a> und <b>Mieten</b> wählen.</li>
+        <li>Ort ${v ? `<b>${esc(v.name)}</b> eingeben und Umkreis <b>${v.stufe} km</b> wählen. Das deckt alle deine Suchgebiete ab.` : "eingeben, der alle deine Suchgebiete abdeckt, mit grosszügigem Umkreis."}
+          Gibt es keinen passenden Umkreis, stattdessen die betroffenen Bezirke bzw. Gemeinden wählen.</li>
+        <li>Objektart <b>Wohnung</b>. <b>Preis, Zimmer und alle weiteren Filter leer lassen</b>; das erledigt die App.</li>
+        <li>Suchen, dann <b>«Suchabo»</b> bzw. die <b>Glocke</b> anklicken.</li>
+        <li>Als E-Mail ${adr} eintragen, Häufigkeit <b>täglich</b> (oder <b>sofort</b>, falls angeboten).</li>
+        <li>Im Sammel-Gmail die Bestätigungsmail von Comparis öffnen und den Link anklicken.</li>
+      </ol><p class="hinweis" style="margin-top:6px">Einmalig, etwa 3 Minuten. Anpassen musst du das Abo nur, wenn du in der App ausserhalb von ${v ? `${esc(v.name)} + ${v.stufe} km` : "diesem Gebiet"} suchst; dann zeigt diese Anleitung den neuen Umkreis. Nach dem nächsten Suchlauf steht hier «Verbunden».</p>`, !q.ok));
   }
+  html += `<details class="karteikarte" style="box-shadow:none"><summary style="cursor:pointer;font-weight:600">Weitere Portale (optional, meist nicht nötig)</summary>
+    <p class="hinweis" style="margin:8px 0">Comparis enthält die meisten Inserate dieser Portale bereits. Ein eigenes Abo bringt höchstens einzelne zusätzliche Inserate; doppelte erkennt die App automatisch.</p>`;
+  for (const q of qs.filter((q) => !q.pflicht)) {
+    html += karte(q, anleitung(q, `<ol>
+        <li><a href="${esc(q.link)}" target="_blank" rel="noopener"><b>${esc(q.name)}</b> öffnen</a>, Mieten, ${v ? `Ort <b>${esc(v.name)}</b> mit Umkreis <b>${v.stufe} km</b>` : "grosszügiges Gebiet"}, sonst keine Filter.</li>
+        <li><b>«Suchabo»</b> bzw. Glocke anklicken; Konto mit ${adr} anlegen.</li>
+        <li>Häufigkeit täglich; Bestätigungsmail im Sammel-Gmail anklicken.</li></ol>`, false));
+  }
+  html += `</details>`;
   html += `<div class="karteikarte"><div class="quelle"><span class="sym ${p.ok ? "gruen" : "orange"}">✉</span><strong>Sammelpostfach</strong>
     ${p.ok ? `<span class="pill gruen">Erreichbar</span>` : `<span class="pill orange">Problem</span>`}
     <span class="unter">${p.adresse ? esc(p.adresse) + " · " : ""}${p.ok ? `zuletzt geprüft ${p.geprueft ? vorTagen(p.geprueft) + " " + new Date(p.geprueft).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" }) : ""}` : esc(p.fehler || "nicht geprüft")}</span></div></div>`;
   $("quellenInhalt").innerHTML = html;
   $("quellenInhalt").querySelectorAll("[data-anl]").forEach((b) => b.onclick = () => {
-    z.offeneAnleitung = z.offeneAnleitung === b.dataset.anl ? null : b.dataset.anl; quellenZeichnen(); });
+    z.offeneAnleitung = b.dataset.offen === "true" ? "" : b.dataset.anl; quellenZeichnen(); });
 }
 
 // ---------- Editor ----------
