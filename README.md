@@ -40,9 +40,12 @@ ihren Nutzungsbedingungen. Ihre eigenen E-Mail-Suchabos sind der zulässige und 
 
 ## Kriterien ändern
 
-Am einfachsten auf der Karte im Reiter **Meine Suche**: Gebiete per Ortssuche oder Klick auf die Karte
-setzen, Eckdaten anpassen, **Suche übernehmen**. Das legt eine Datei in `suche/` an (die neueste gilt)
-und startet sofort einen Lauf. Alternativ `config.yaml` direkt bearbeiten.
+Am einfachsten auf der Karte: Im Reiter *Wohnungen* einen Ort eintippen und «zur Suche hinzufügen»,
+oder im Reiter **Meine Suche** Gebiete und Eckdaten anpassen und **Suche speichern**. Beim ersten
+Speichern fragt die Karte einmalig nach einem GitHub-Zugangsschlüssel (nur dieses Repository,
+Contents: Read and write; er bleibt im Browser). Gespeichert wird in `suche.yaml`; das startet sofort
+einen Suchlauf, dessen Ergebnis die Karte direkt anzeigt. Alternativ `suche.yaml` oder `config.yaml`
+direkt bearbeiten.
 
 Hinweis: Dieses Repository ist öffentlich; Suchkriterien und Kartendaten sind damit einsehbar
 (die Seite ist für Suchmaschinen gesperrt). Empfänger und Zugangsdaten liegen nur in den Secrets.

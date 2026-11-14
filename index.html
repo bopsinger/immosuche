@@ -72,6 +72,33 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .vorschlaege button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
 .vorschlaege button:last-child{border-bottom:0}
 .leer{padding:24px 16px;color:var(--muted);text-align:center}
+.ortbox{margin:0 16px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.ortbox[hidden]{display:none}
+.ortbox button.ortwahl{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:8px 10px;font:inherit;cursor:pointer}
+.ortbox button.ortwahl:last-child{border-bottom:0}
+.ortbox button.ortwahl small{color:var(--muted)}
+.hinweisbox{margin:10px 16px;padding:12px;border-radius:var(--radius);background:var(--warn-soft);color:var(--text);display:grid;gap:8px}
+.hinweisbox[hidden]{display:none}
+.status{background:var(--accent-soft);border-color:transparent}
+.status .zeile{gap:8px}
+.punkt{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.punkt.offen{background:var(--warn)}
+.speichern{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:grid;gap:6px}
+.speichern .knopf{width:100%;padding:11px}
+.link{border:0;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+dialog{border:0;border-radius:14px;padding:0;max-width:440px;width:calc(100% - 32px);background:var(--panel);color:var(--text);box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:20px;display:grid;gap:12px}
+.dlg h2{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+.dlg ol{margin:0;padding-left:20px;display:grid;gap:6px}
+.dlg .gross{font-size:15px}
+.ok{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:16px;flex:none}
+.fortschritt{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;background:var(--bg);font-size:13px}
+.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:dreh 1s linear infinite;flex:none}
+@keyframes dreh{to{transform:rotate(360deg)}}
+.fehler{color:#b3261e;font-size:13px}
+.zusammenfassung{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:0}
+.zusammenfassung dt{color:var(--muted)}.zusammenfassung dd{margin:0}
 /* Preisschilder auf der Karte */
 .preis{background:#fff;color:#1d211c;border:2px solid #2f7d32;border-radius:999px;padding:1px 7px;font:700 12px/18px system-ui,sans-serif;
   white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translate(-50%,-50%);display:inline-block;font-variant-numeric:tabular-nums}
@@ -108,7 +135,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
   <section class="bereich" id="tab-liste">
     <div class="filter">
-      <input type="search" id="text" placeholder="Suche: Ort, Strasse, Titel …">
+      <input type="search" id="text" placeholder="Ort, Strasse oder Stichwort …" autocomplete="off">
       <div class="zeile" id="quellen"></div>
       <div class="zeile">
         <select id="seit" aria-label="Erfasst seit">
@@ -134,6 +161,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <label class="fein">Preis bis: <strong id="preisWert">alle</strong>
         <input type="range" id="preis" min="0" max="100" step="1" value="100"></label>
     </div>
+    <div class="ortbox" id="ortbox" hidden></div>
+    <div class="hinweisbox" id="ortHinweis" hidden></div>
     <div class="anzahl" id="anzahl"></div>
     <ul class="liste" id="liste"></ul>
     <button class="knopf leise mehr" id="mehr" hidden>Weitere anzeigen</button>
@@ -141,7 +170,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
   <section class="bereich" id="tab-suche" hidden>
     <div class="gebiete">
-      <p class="hinweis">Hier legst du fest, was die tägliche Suche findet. Änderungen bleiben in diesem Browser, bis du sie unten übernimmst.</p>
+      <div class="karteikarte status" id="status"></div>
 
       <div class="karteikarte">
         <h3>Gebiete</h3>
@@ -192,20 +221,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <p class="hinweis">Inserate mit diesen Begriffen in Titel oder Beschreibung werden verworfen.</p>
       </div>
 
-      <div class="karteikarte">
-        <h3>Für die tägliche Suche übernehmen</h3>
-        <p class="hinweis">Ein Klick öffnet GitHub mit allem fertig ausgefüllt; dort nur noch <b>Commit changes</b> und nochmals <b>Commit changes</b> drücken. Kurz darauf läuft die Suche mit den neuen Kriterien, und neue Treffer kommen per E-Mail.</p>
-        <div class="zeile">
-          <button class="knopf" id="uebernehmen">Suche übernehmen</button>
-          <button class="knopf leise" id="zuruecksetzen">Auf aktive Suche zurücksetzen</button>
-        </div>
-        <details><summary class="hinweis">Inhalt anzeigen</summary><pre id="yaml"></pre>
-          <button class="knopf leise" id="kopieren" style="margin-top:8px">Kopieren</button></details>
+    </div>
+    <div class="speichern">
+      <button class="knopf" id="speichern">Suche speichern</button>
+      <div class="zeile" style="justify-content:space-between">
+        <button class="link" id="zuruecksetzen">Änderungen verwerfen</button>
+        <button class="link" id="trennen" hidden>Verbindung zu GitHub trennen</button>
       </div>
     </div>
   </section>
 </aside>
 <main id="karte"></main>
+<dialog id="dlg"><div class="dlg" id="dlgInhalt"></div></dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -374,9 +401,9 @@ function formularFuellen() {
     };
     box.appendChild(b);
   }
-  gebieteZeichnen(); $("yaml").textContent = yaml();
+  gebieteZeichnen(); statusZeigen();
 }
-function geaendert(neuZeichnen = true) { sichern(); if (neuZeichnen) gebieteZeichnen(); $("yaml").textContent = yaml(); }
+function geaendert(neuZeichnen = true) { sichern(); if (neuZeichnen) gebieteZeichnen(); statusZeigen(); }
 
 document.querySelectorAll("[data-angebot]").forEach((b) => b.onclick = () => { zustand.suche.angebot = b.dataset.angebot; formularFuellen(); sichern(); });
 document.querySelectorAll("[data-kat]").forEach((b) => b.onclick = () => {
@@ -390,12 +417,10 @@ $("k_ausschluss").addEventListener("input", (e) => {
   zustand.suche.ausschluss_woerter = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); geaendert(false);
 });
 
-function yaml() {
-  const s = zustand.suche, q = (x) => JSON.stringify(x), n = (x) => x == null ? "null" : String(x);
+function yaml(s = zustand.suche, kopf = true) {
+  const q = (x) => JSON.stringify(x), n = (x) => x == null ? "null" : String(x);
   const liste = (a) => `[${(a || []).map(q).join(", ")}]`;
-  return `# Erstellt mit der Immosuche-Karte am ${new Date().toLocaleDateString("de-CH")}.
-# Es gilt immer die neueste Datei im Ordner suche/.
-suche:
+  return `${kopf ? `# Gespeichert über die Immosuche-Karte am ${new Date().toLocaleDateString("de-CH")}.\n` : ""}suche:
   angebot: ${s.angebot || "RENT"}
   kategorien: ${liste(s.kategorien)}
   orte:
@@ -426,24 +451,196 @@ $("kreisSpeichern").onclick = () => {
   entwurf = null; $("kreisName").value = ""; $("adresse").value = ""; $("kreisSpeichern").disabled = true;
   geaendert();
 };
-$("uebernehmen").onclick = () => {
-  if (!(zustand.suche.orte || []).length) { alert("Bitte zuerst mindestens ein Gebiet anlegen."); return; }
-  const z = new Date(), p = (x) => String(x).padStart(2, "0");
-  const name = `suche/${z.getFullYear()}-${p(z.getMonth() + 1)}-${p(z.getDate())}_${p(z.getHours())}${p(z.getMinutes())}${p(z.getSeconds())}.yaml`;
-  const url = `https://github.com/${REPO}/new/main?filename=${encodeURIComponent(name)}`
-    + `&value=${encodeURIComponent(yaml())}&message=${encodeURIComponent("Suche von der Karte übernommen")}`;
-  window.open(url, "_blank", "noopener");
-};
 $("zuruecksetzen").onclick = () => {
-  if (!confirm("Entwurf verwerfen und die aktive Suche laden?")) return;
   zustand.suche = kopie(zustand.aktiveSuche); try { localStorage.removeItem(ENTWURF); } catch {}
   entwurf = null; formularFuellen();
 };
-$("kopieren").onclick = async () => {
-  try { await navigator.clipboard.writeText(yaml()); $("kopieren").textContent = "Kopiert"; }
-  catch { const r = document.createRange(); r.selectNodeContents($("yaml")); getSelection().removeAllRanges(); getSelection().addRange(r); $("kopieren").textContent = "Markiert, bitte kopieren"; }
-  setTimeout(() => ($("kopieren").textContent = "Kopieren"), 2000);
-};
+
+// ---------- Status, Speichern über GitHub ----------
+const KAT = { APARTMENT: "Wohnung", HOUSE: "Haus", SHARED: "WG-Zimmer" };
+function kurzKriterien(s) {
+  const t = [(s.angebot === "SALE" ? "Kaufen" : "Mieten") + ": " + ((s.kategorien || []).map((k) => KAT[k] || k).join(", ") || "alle")];
+  if (s.preis_min != null || s.preis_max != null) t.push(s.preis_max != null ? `${s.preis_min != null ? chf(s.preis_min) + " bis " : "bis "}${chf(s.preis_max)}` : `ab ${chf(s.preis_min)}`);
+  if (s.zimmer_min != null || s.zimmer_max != null) t.push(`${s.zimmer_min ?? "?"}${s.zimmer_max != null ? "–" + s.zimmer_max : "+"} Zimmer`);
+  if (s.flaeche_min != null) t.push(`ab ${s.flaeche_min} m²`);
+  if ((s.merkmale_pflicht || []).length) t.push(s.merkmale_pflicht.map((m) => MERKMALE[m] || m).join(", "));
+  return t.join(" · ");
+}
+const orteText = (s) => (s.orte || []).map((o) => `${o.name} (${String(o.umkreis_km).replace(".", ",")} km)`).join(", ") || "keine Gebiete";
+function versandText() {
+  const v = zustand.versand || {}, an = (v.an || []).join(", ");
+  return an ? `täglich um ca. ${v.zeit || "06:17"} Uhr an ${an}` : "an die hinterlegte Adresse (noch keine eingetragen)";
+}
+const ungespeichert = () => zustand.aktiveSuche && yaml(zustand.suche, false) !== yaml(zustand.aktiveSuche, false);
+function statusZeigen() {
+  if (!zustand.aktiveSuche) return;
+  const offen = ungespeichert();
+  $("status").innerHTML = `<div class="zeile"><span class="punkt${offen ? " offen" : ""}"></span><strong>${offen ? "Ungespeicherte Änderungen" : "Deine Suche ist aktiv"}</strong></div>
+    <p class="hinweis" style="color:var(--text)">${esc(orteText(zustand.aktiveSuche))}<br>${esc(kurzKriterien(zustand.aktiveSuche))}</p>
+    <p class="hinweis">Neue Wohnungen kommen per E-Mail ${esc(versandText())}.</p>`;
+  $("speichern").disabled = !offen;
+  $("speichern").textContent = offen ? "Suche speichern" : "Gespeichert";
+  $("zuruecksetzen").hidden = !offen;
+  $("trennen").hidden = !tokenLesen();
+}
+
+const TOKEN = "immosuche.github.v1";
+const API = `https://api.github.com/repos/${REPO}`;
+const tokenLesen = () => { try { return localStorage.getItem(TOKEN) || ""; } catch { return ""; } };
+const tokenSetzen = (t) => { try { t ? localStorage.setItem(TOKEN, t) : localStorage.removeItem(TOKEN); } catch {} };
+async function gh(pfad, opt = {}, token = tokenLesen()) {
+  const r = await fetch(API + pfad, { ...opt, cache: "no-store", headers: { Accept: "application/vnd.github+json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opt.headers || {}) } });
+  if (!r.ok) { const e = new Error(`GitHub antwortet mit Fehler ${r.status}`); e.status = r.status; throw e; }
+  return r.json();
+}
+function b64(txt) { let b = ""; for (const x of new TextEncoder().encode(txt)) b += String.fromCharCode(x); return btoa(b); }
+
+const dlg = $("dlg");
+function dialog(html) { $("dlgInhalt").innerHTML = html; if (!dlg.open) dlg.showModal(); }
+const dialogZu = () => dlg.close();
+dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+function meldung(titel, text) {
+  dialog(`<h2>${titel}</h2><p class="gross" style="margin:0">${text}</p><div class="zeile" style="justify-content:flex-end"><button class="knopf" id="dlgOk">OK</button></div>`);
+  $("dlgOk").onclick = dialogZu;
+}
+
+$("speichern").onclick = () => tokenLesen() ? speichern() : verbindenDialog();
+$("trennen").onclick = () => { if (confirm("Den gespeicherten GitHub-Schlüssel aus diesem Browser entfernen?")) { tokenSetzen(""); statusZeigen(); } };
+
+function verbindenDialog(fehler = "") {
+  const url = `https://github.com/settings/personal-access-tokens/new?name=${encodeURIComponent("Immosuche Karte")}`
+    + `&description=${encodeURIComponent("Speichert Suchen von der Immosuche-Karte")}`;
+  dialog(`<h2>Einmalig mit GitHub verbinden</h2>
+    <p class="gross" style="margin:0">Damit die Karte deine Suche speichern darf, braucht sie einmalig einen Zugangsschlüssel. Danach speicherst du mit einem Klick.</p>
+    <ol>
+      <li><a href="${url}" target="_blank" rel="noopener"><b>Schlüssel auf GitHub erstellen</b></a> (öffnet einen neuen Tab)</li>
+      <li><b>Expiration:</b> «No expiration» oder ein spätes Datum wählen.</li>
+      <li><b>Repository access:</b> «Only select repositories», dann <b>immosuche</b> auswählen.</li>
+      <li><b>Permissions:</b> «Add permissions», <b>Contents</b> anhaken, rechts «Read and write» wählen.</li>
+      <li>Ganz unten <b>Generate token</b>, den Schlüssel (beginnt mit <code>github_pat_</code>) kopieren und hier einfügen:</li>
+    </ol>
+    <input type="text" id="tokenFeld" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+    ${fehler ? `<p class="fehler" style="margin:0">${esc(fehler)}</p>` : ""}
+    <p class="hinweis">Der Schlüssel bleibt nur in diesem Browser und erlaubt ausschliesslich Änderungen an diesem einen Repository.</p>
+    <div class="zeile" style="justify-content:flex-end"><button class="knopf leise" id="dlgAbbrechen">Abbrechen</button><button class="knopf" id="dlgVerbinden">Verbinden und speichern</button></div>`);
+  $("dlgAbbrechen").onclick = dialogZu;
+  $("dlgVerbinden").onclick = async () => {
+    const t = $("tokenFeld").value.trim();
+    if (!t) { $("tokenFeld").focus(); return; }
+    $("dlgVerbinden").disabled = true; $("dlgVerbinden").textContent = "Prüfe …";
+    try { await gh("", {}, t); tokenSetzen(t); speichern(); }
+    catch (e) { verbindenDialog(e.status === 401 ? "GitHub kennt diesen Schlüssel nicht. Bitte nochmals vollständig kopieren." : e.message); }
+  };
+}
+
+async function speichern() {
+  if (!(zustand.suche.orte || []).length) { meldung("Noch kein Gebiet", "Bitte lege zuerst mindestens ein Gebiet an."); return; }
+  dialog(`<h2><span class="spinner"></span>Suche wird gespeichert …</h2>`);
+  try {
+    let sha;
+    try { sha = (await gh("/contents/suche.yaml?ref=main")).sha; } catch (e) { if (e.status !== 404) throw e; }
+    const res = await gh("/contents/suche.yaml", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Suche über die Karte gespeichert", content: b64(yaml()), sha, branch: "main" }) });
+    zustand.aktiveSuche = kopie(zustand.suche);
+    try { localStorage.removeItem(ENTWURF); } catch {}
+    entwurf = null; formularFuellen();
+    bestaetigung(res.commit.sha);
+  } catch (e) {
+    if (e.status === 401) { tokenSetzen(""); verbindenDialog("Der gespeicherte Schlüssel ist abgelaufen oder ungültig. Bitte einen neuen erstellen."); }
+    else if (e.status === 403 || e.status === 404) { tokenSetzen(""); verbindenDialog("Der Schlüssel darf dieses Repository nicht ändern. Bitte prüfen: Repository «immosuche» ausgewählt und bei Contents «Read and write»."); }
+    else meldung("Speichern fehlgeschlagen", esc(e.message || "Unbekannter Fehler") + ". Bitte später nochmals versuchen.");
+  }
+}
+
+function bestaetigung(commit) {
+  const s = zustand.aktiveSuche;
+  dialog(`<h2><span class="ok">✓</span>Suche gespeichert</h2>
+    <dl class="zusammenfassung">
+      <dt>Gebiete</dt><dd>${esc(orteText(s))}</dd>
+      <dt>Suche</dt><dd>${esc(kurzKriterien(s))}</dd>
+      <dt>E-Mail</dt><dd>Sobald neue Wohnungen auftauchen, ${esc(versandText())}.</dd>
+    </dl>
+    <div class="fortschritt" id="lauf"><span class="spinner"></span><span>Der erste Suchlauf startet …</span></div>
+    <div class="zeile" style="justify-content:flex-end"><button class="knopf" id="dlgOk">Fertig</button></div>`);
+  $("dlgOk").onclick = dialogZu;
+  laufVerfolgen(commit);
+}
+async function laufVerfolgen(commit) {
+  const setze = (html, fertig) => { const el = $("lauf"); if (el) el.innerHTML = (fertig ? "" : '<span class="spinner"></span>') + `<span>${html}</span>`; };
+  const start = Date.now();
+  while (Date.now() - start < 8 * 60e3) {
+    await new Promise((r) => setTimeout(r, 8000));
+    let lauf;
+    try { lauf = (await gh(`/actions/runs?head_sha=${commit}&per_page=1`, {}, "")).workflow_runs[0]; } catch { continue; }
+    if (!lauf) continue;
+    if (lauf.status !== "completed") { setze("Suchlauf läuft, das dauert etwa eine Minute …"); continue; }
+    if (lauf.conclusion !== "success") { setze(`Der Suchlauf ist fehlgeschlagen. <a href="${esc(lauf.html_url)}" target="_blank" rel="noopener">Details auf GitHub</a>`, true); return; }
+    try {
+      const r = await fetch(`${API}/contents/daten.json?ref=main`, { cache: "no-store",
+        headers: { Accept: "application/vnd.github.raw+json", Authorization: `Bearer ${tokenLesen()}` } });
+      const d = await r.json();
+      datenUebernehmen(d, true);
+      const l = (d.versand || {}).letzter_lauf || {};
+      setze(`Fertig: ${d.inserate.length} passende Wohnung${d.inserate.length === 1 ? "" : "en"} auf der Karte.`
+        + (l.mail ? ` ${l.neu} neue sind per E-Mail unterwegs.` : l.neu ? "" : " Keine neuen seit der letzten E-Mail."), true);
+    } catch { setze("Fertig. Lade die Seite in ein bis zwei Minuten neu, um die Ergebnisse zu sehen.", true); }
+    return;
+  }
+  setze("Der Suchlauf braucht länger als üblich. Die Ergebnisse erscheinen später auf der Karte und per E-Mail.", true);
+}
+
+// ---------- Ortssuche im Reiter Wohnungen ----------
+function distanzKm(a, b) {
+  const r = Math.PI / 180, dl = (b[0] - a[0]) * r, dn = (b[1] - a[1]) * r;
+  const h = Math.sin(dl / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dn / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+const imSuchgebiet = (lat, lon) => (zustand.aktiveSuche.orte || []).some((o) => o.lat != null && distanzKm([o.lat, o.lon], [lat, lon]) <= o.umkreis_km);
+const inDerNaehe = (lat, lon, km = 2) => zustand.inserate.filter((w) => w.lat != null && distanzKm([w.lat, w.lon], [lat, lon]) <= km).length;
+let ortTimer, ortAnfrage = 0;
+function ortsvorschlaege(q) {
+  clearTimeout(ortTimer);
+  if (q.trim().length < 3) { $("ortbox").hidden = true; $("ortHinweis").hidden = true; return; }
+  const nr = ++ortAnfrage;
+  ortTimer = setTimeout(async () => {
+    try {
+      const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&origins=gg25,zipcode,gazetteer&sr=4326&limit=4&searchText=${encodeURIComponent(q)}`;
+      const t = (await (await fetch(u)).json()).results || [];
+      if (nr !== ortAnfrage) return;
+      const box = $("ortbox"); box.innerHTML = "";
+      const gesehen = new Set();
+      for (const r of t) {
+        const tmp = document.createElement("div"); tmp.innerHTML = r.attrs.label; const name = tmp.textContent.trim();
+        if (gesehen.has(name)) continue; gesehen.add(name);
+        const n = inDerNaehe(r.attrs.lat, r.attrs.lon);
+        const b = document.createElement("button"); b.className = "ortwahl";
+        b.innerHTML = `<span>📍 ${esc(name)}</span><small>${n ? `${n} Wohnung${n === 1 ? "" : "en"} in der Nähe` : "noch nicht in deiner Suche"}</small>`;
+        b.onclick = () => ortGewaehlt(name, r.attrs.lat, r.attrs.lon);
+        box.appendChild(b);
+      }
+      box.hidden = !box.children.length;
+    } catch { $("ortbox").hidden = true; }
+  }, 250);
+}
+function ortGewaehlt(name, lat, lon) {
+  $("ortbox").hidden = true;
+  $("text").value = ""; zustand.text = ""; zustand.sichtbar = 100; zeichnen();
+  karte.flyTo([lat, lon], 14, { duration: .8 });
+  const kurzname = name.replace(/\s*\(.*\)$/, "").replace(/^\d{4}\s+/, "");
+  const box = $("ortHinweis");
+  if (imSuchgebiet(lat, lon) && inDerNaehe(lat, lon)) { box.hidden = true; return; }
+  box.innerHTML = imSuchgebiet(lat, lon)
+    ? `<div><strong>Zurzeit keine passenden Wohnungen in ${esc(kurzname)}.</strong><br><span class="hinweis">Der Ort liegt in deinem Suchgebiet; neue Inserate kommen automatisch per E-Mail.</span></div>`
+    : `<div><strong>${esc(kurzname)} ist noch nicht in deiner Suche.</strong><br><span class="hinweis">Füge den Ort als Suchgebiet hinzu; danach erscheinen die Wohnungen hier und neue kommen per E-Mail.</span></div>
+       <button class="knopf" id="ortDazu">${esc(kurzname)} zur Suche hinzufügen</button>`;
+  box.hidden = false;
+  const dazu = $("ortDazu");
+  if (dazu) dazu.onclick = () => {
+    (zustand.suche.orte ||= []).push({ name: kurzname, lat: +(+lat).toFixed(6), lon: +(+lon).toFixed(6), umkreis_km: 3 });
+    box.hidden = true; geaendert(); tab("suche");
+  };
+}
 
 // Ortssuche über geo.admin.ch
 let suchTimer;
@@ -492,15 +689,19 @@ $("preis").addEventListener("input", () => {
   clearTimeout(tippTimer); tippTimer = setTimeout(neuFiltern, 120);
 });
 let tippTimer;
-$("text").addEventListener("input", () => { clearTimeout(tippTimer); tippTimer = setTimeout(() => { zustand.text = $("text").value; neuFiltern(); }, 200); });
+$("text").addEventListener("input", () => {
+  clearTimeout(tippTimer); tippTimer = setTimeout(() => { zustand.text = $("text").value; neuFiltern(); }, 200);
+  $("ortHinweis").hidden = true; ortsvorschlaege($("text").value);
+});
 $("mehr").onclick = () => { zustand.sichtbar += 100; zeichnen(); };
 
 // ---------- Start ----------
-fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+function datenUebernehmen(d, aktualisierung = false) {
   zustand.inserate = d.inserate || [];
+  zustand.versand = d.versand || {};
   zustand.alleQuellen = [...new Set(zustand.inserate.map((w) => w.q))].sort();
   zustand.quellen = new Set(zustand.alleQuellen);
-  const box = $("quellen");
+  const box = $("quellen"); box.innerHTML = "";
   for (const q of zustand.alleQuellen) {
     const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
     b.textContent = `${q} (${zustand.inserate.filter((w) => w.q === q).length})`;
@@ -508,6 +709,7 @@ fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
     box.appendChild(b);
   }
   // Preisregler in sinnvollen Stufen zwischen kleinstem und grösstem Preis
+  preisStufen = []; zustand.preisMax = null; $("preisWert").textContent = "alle";
   const preise = zustand.inserate.map((w) => w.p).filter(Boolean).sort((a, b) => a - b);
   if (preise.length) {
     const lo = Math.floor(preise[0] / 100) * 100, hi = Math.ceil(preise.at(-1) / 100) * 100;
@@ -518,10 +720,14 @@ fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
   }
   const s = new Date(d.stand);
   $("stand").textContent = `${zustand.inserate.length} Inserate aus ${zustand.alleQuellen.length || 0} Quelle${zustand.alleQuellen.length === 1 ? "" : "n"} · Stand ${s.toLocaleDateString("de-CH")} ${s.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
-  zustand.aktiveSuche = d.kriterien || { angebot: "RENT", kategorien: ["APARTMENT"], orte: [] };
-  zustand.suche = ladeEntwurf() || kopie(zustand.aktiveSuche);
-  formularFuellen(); zeichnen(true);
-}).catch(() => { $("stand").textContent = "Daten konnten nicht geladen werden."; });
+  if (!aktualisierung) {   // nach dem Speichern gilt die eben gespeicherte Suche als aktiv
+    zustand.aktiveSuche = d.kriterien || { angebot: "RENT", kategorien: ["APARTMENT"], orte: [] };
+    zustand.suche = ladeEntwurf() || kopie(zustand.aktiveSuche);
+  }
+  formularFuellen(); zeichnen(!aktualisierung || aktuellerTab === "liste");
+}
+fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => datenUebernehmen(d))
+.catch(() => { $("stand").textContent = "Daten konnten nicht geladen werden."; });
 </script>
 </body>
 </html>

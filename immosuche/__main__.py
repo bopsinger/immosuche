@@ -31,17 +31,28 @@ POSTFACH_TAGE = 21   # Inserate aus Portal-Mails so lange auf der Karte zeigen
 
 
 def load_config(root: Path, explicit: str | None) -> tuple[dict, str]:
-    cfg = yaml.safe_load((root / "config.yaml").read_text())
-    source = "config.yaml"
-    files = sorted((root / "suche").glob("*.yaml")) if not explicit else []
+    """Grundeinstellung aus config.yaml; der Abschnitt "suche" kommt (falls vorhanden) aus
+    suche.yaml (von der Karte gespeichert), sonst aus der neuesten Datei in suche/."""
     if explicit:
-        cfg = yaml.safe_load(Path(explicit).read_text())
-        source = explicit
-    elif files:
-        neu = yaml.safe_load(files[-1].read_text()) or {}
-        cfg["suche"] = neu.get("suche", neu)   # Datei darf nur den Abschnitt "suche" enthalten
-        source = str(files[-1].relative_to(root))
-    return cfg, source
+        return yaml.safe_load(Path(explicit).read_text()), explicit
+    cfg = yaml.safe_load((root / "config.yaml").read_text())
+    kandidaten = [root / "suche.yaml"] + sorted((root / "suche").glob("*.yaml"), reverse=True)
+    for f in kandidaten:
+        if f.is_file():
+            neu = yaml.safe_load(f.read_text()) or {}
+            cfg["suche"] = neu.get("suche", neu)   # Datei darf nur den Abschnitt "suche" enthalten
+            return cfg, str(f.relative_to(root))
+    return cfg, "config.yaml"
+
+
+def maskieren(adresse: str) -> str:
+    """s.mueller@beispiel.ch -> s•••@b•••.ch (Empfänger sind öffentlich sichtbar, daher nur angedeutet)."""
+    try:
+        name, dom = adresse.strip().split("@", 1)
+        teile = dom.rsplit(".", 1)
+        return f"{name[:1]}•••@{teile[0][:1]}•••.{teile[1]}" if len(teile) == 2 else f"{name[:1]}•••@•••"
+    except ValueError:
+        return "•••"
 
 
 def load_state(path: Path) -> dict:
@@ -111,7 +122,8 @@ def dedupe(items: list[Listing], st: dict) -> tuple[list[Listing], dict[str, lis
     return group(fresh)
 
 
-def kartendaten(listings: list[Listing], also: dict[str, list[Listing]], st: dict, crit: dict, quelle: str) -> dict:
+def kartendaten(listings: list[Listing], also: dict[str, list[Listing]], st: dict, crit: dict, quelle: str,
+                versand: dict | None = None) -> dict:
     def eintrag(l: Listing) -> dict:
         d = {"id": l.uid, "q": l.source, "t": l.title, "u": l.url, "p": l.price, "z": l.rooms, "f": l.area,
              "plz": l.zipcode, "o": l.city, "s": l.street, "b": l.image, "v": l.available,
@@ -121,7 +133,7 @@ def kartendaten(listings: list[Listing], also: dict[str, list[Listing]], st: dic
              "a": [{"q": d.source, "u": d.url} for d in also.get(l.uid, [])] or None}
         return {k: v for k, v in d.items() if v not in (None, "")}
     return {"stand": datetime.now(timezone.utc).isoformat(timespec="minutes"), "quelle": quelle,
-            "kriterien": crit, "inserate": sorted((eintrag(l) for l in listings), key=lambda e: e["e"], reverse=True)}
+            "kriterien": crit, "versand": versand or {}, "inserate": sorted((eintrag(l) for l in listings), key=lambda e: e["e"], reverse=True)}
 
 
 def main() -> int:
@@ -224,7 +236,10 @@ def main() -> int:
         st["mails"][m] = now
 
     alle, also_alle = group(aktuell)
-    (root / "daten.json").write_text(json.dumps(kartendaten(alle, also_alle, st, crit, quelle),
+    versand = {"an": [maskieren(a) for a in os.environ.get("MAIL_TO", "").split(",") if a.strip()],
+                "zeit": os.environ.get("VERSAND_ZEIT", "06:17"), "nur_bei_treffern": notif.get("nur_bei_treffern", True),
+                "letzter_lauf": {"neu": len(new), "mail": bool(new) and zugestellt and should_send}}
+    (root / "daten.json").write_text(json.dumps(kartendaten(alle, also_alle, st, crit, quelle, versand),
                                                 ensure_ascii=False, separators=(",", ":")))
     save_state(state_path, st)
     return 0

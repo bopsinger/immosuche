@@ -6,7 +6,7 @@ on:
   workflow_dispatch:       # manuell auslösbar unter "Actions"
   push:                    # neue Suche von der Karte sofort ausführen
     branches: [main]
-    paths: ["suche/**", "config.yaml"]
+    paths: ["suche.yaml", "suche/**", "config.yaml"]
 
 permissions:
   contents: write          # Zustand (bereits gemeldete Inserate) zurückschreiben
@@ -35,6 +35,7 @@ jobs:
           SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
           SMTP_PORT: ${{ secrets.SMTP_PORT || '465' }}
           IMAP_HOST: ${{ secrets.IMAP_HOST || 'imap.gmail.com' }}
+          VERSAND_ZEIT: "06:17"
         run: python -m immosuche
       - name: Zustand speichern
         if: always()
