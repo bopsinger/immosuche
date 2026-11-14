@@ -5,6 +5,9 @@ Durchsucht einmal täglich mehrere Schweizer Immobilienquellen nach den Kriterie
 und schickt **eine** Sammelmail mit allen neuen Treffern an beliebig viele Adressen.
 Bereits gemeldete Inserate werden nie ein zweites Mal verschickt.
 
+**Karte:** https://bopsinger.github.io/immosuche/ (alle aktuell passenden Wohnungen,
+Filter, Fotos; im Reiter *Meine Suche* Gebiete auf der Karte festlegen und Kriterien ändern).
+
 ## Quellen
 
 | Quelle | Zugang |
@@ -37,8 +40,12 @@ ihren Nutzungsbedingungen. Ihre eigenen E-Mail-Suchabos sind der zulässige und 
 
 ## Kriterien ändern
 
-`config.yaml` bearbeiten (direkt auf GitHub möglich) und speichern. Ändern sich die Kriterien,
-werden früher verworfene Inserate automatisch neu geprüft.
+Am einfachsten auf der Karte im Reiter **Meine Suche**: Gebiete per Ortssuche oder Klick auf die Karte
+setzen, Eckdaten anpassen, **Suche übernehmen**. Das legt eine Datei in `suche/` an (die neueste gilt)
+und startet sofort einen Lauf. Alternativ `config.yaml` direkt bearbeiten.
+
+Hinweis: Dieses Repository ist öffentlich; Suchkriterien und Kartendaten sind damit einsehbar
+(die Seite ist für Suchmaschinen gesperrt). Empfänger und Zugangsdaten liegen nur in den Secrets.
 
 ## Lokal testen
 
@@ -50,4 +57,5 @@ python -m immosuche --dry-run --html vorschau.html
 ## Zeitplan
 
 `.github/workflows/taeglich.yml`: täglich 05:17 UTC (06:17 Uhr im Winter, 07:17 Uhr im Sommer).
-Bereits gemeldete Inserate stehen in `state/state.json`, das der Lauf selbst aktualisiert.
+Bereits gemeldete Inserate stehen in `state/state.json`, die Kartendaten in `daten.json`;
+beides aktualisiert der Lauf selbst.

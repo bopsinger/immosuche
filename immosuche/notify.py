@@ -34,14 +34,15 @@ def _place(l: Listing) -> str:
     return ", ".join(x for x in (l.street, f"{l.zipcode} {l.city}".strip()) if x)
 
 
-def render(listings: list[Listing], also_on: dict[str, list[Listing]]) -> tuple[str, str]:
+def render(listings: list[Listing], also_on: dict[str, list[Listing]], karte: str = "") -> tuple[str, str]:
     groups: dict[str, list[Listing]] = defaultdict(list)
     for l in listings:
         groups[l.source].append(l)
 
     h = ['<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:680px;color:#1d1d1f">',
          f'<h2 style="margin:0 0 4px">{len(listings)} neue Treffer</h2>',
-         f'<p style="margin:0 0 20px;color:#666">Quellen: {", ".join(sorted(groups))}</p>']
+         f'<p style="margin:0 0 20px;color:#666">Quellen: {", ".join(sorted(groups))}'
+         + (f' · <a href="{html.escape(karte)}" style="color:#0a58ca">Alle auf der Karte</a>' if karte else "") + '</p>']
     t = [f"{len(listings)} neue Treffer\n"]
     for src in sorted(groups):
         h.append(f'<h3 style="border-bottom:1px solid #ddd;padding-bottom:4px;margin:24px 0 8px">{html.escape(src)}</h3>')
@@ -58,7 +59,9 @@ def render(listings: list[Listing], also_on: dict[str, list[Listing]]) -> tuple[
                 f'<span style="color:#666;font-size:13px">{html.escape(_place(l))}{dup_html}</span></td></tr></table>')
             t.append(f"- {l.title}\n  {_facts(l)} | {_place(l)}\n  {l.url}")
             t.extend(f"  auch auf {d.source}: {d.url}" for d in dup)
-    h.append('<p style="color:#999;font-size:12px;margin-top:28px">Automatisch erstellt durch immosuche (GitHub Actions).</p></div>')
+    if karte:
+        t.append(f"\nKarte: {karte}")
+    h.append('<!--ende--><p style="color:#999;font-size:12px;margin-top:28px">Automatisch erstellt durch immosuche (GitHub Actions).</p></div>')
     return "\n".join(t), "".join(h)
 
 

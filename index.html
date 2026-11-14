@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Immosuche Karte</title>
+<meta name="description" content="Aktuelle Wohnungsinserate aus mehreren Portalen auf der Karte">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f7d32'/%3E%3Cpath d='M6 26V14l10-7 10 7v12h-7v-7h-6v7z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#f6f7f5;--panel:#fff;--text:#1d211c;--muted:#636b61;--line:#e3e6e1;
+  --accent:#2f7d32;--accent-soft:#e6f2e6;--warn:#d9822b;--warn-soft:#fbeedd;--grey:#9aa198;
+  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}}
+:root[data-theme="dark"]{--bg:#141613;--panel:#1c1f1b;--text:#e8ebe6;--muted:#9aa398;--line:#2d322b;
+  --accent:#6cbf6f;--accent-soft:#213021;--warn:#f0a456;--warn-soft:#3a2c1c;--grey:#6d746b;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:grid;grid-template-columns:420px 1fr;grid-template-rows:100%;}
+#seite{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+#karte{min-height:0;height:100%}
+header{padding:16px 16px 10px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+h1 .logo{width:24px;height:24px;border-radius:6px;background:var(--accent);display:grid;place-items:center}
+.stand{color:var(--muted);font-size:12px;margin-top:2px}
+nav.tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid var(--line)}
+nav.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 4px;border-bottom:2px solid transparent;cursor:pointer}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-color:var(--accent)}
+.bereich{flex:1;overflow:auto;min-height:0}
+.bereich[hidden]{display:none}
+.filter{padding:12px 16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
+.zeile{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:999px;padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+input[type=search],input[type=text],input[type=number],select{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit}
+select{width:auto}
+.anzahl{font-size:12px;color:var(--muted);padding:8px 16px;border-bottom:1px solid var(--line)}
+ul.liste{list-style:none;margin:0;padding:0}
+ul.liste li{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:96px 1fr;gap:12px}
+ul.liste li:hover,ul.liste li.aktiv{background:var(--accent-soft)}
+.bild{width:96px;height:72px;border-radius:8px;background:var(--line) center/cover no-repeat;display:grid;place-items:center;color:var(--grey)}
+.titel{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fakten{margin-top:2px;font-variant-numeric:tabular-nums}
+.fakten b{font-weight:700}
+.meta{color:var(--muted);font-size:12px;margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.badge{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.badge.neu{background:var(--warn-soft);color:var(--warn)}
+.badge.quelle{background:var(--line);color:var(--muted)}
+.badge.auch{background:var(--accent-soft);color:var(--accent)}
+.mehr{display:block;margin:12px auto;}
+.knopf{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+.knopf.leise{background:none;color:var(--accent)}
+.knopf:disabled{opacity:.5;cursor:default}
+.gebiete{padding:12px 16px;display:grid;gap:12px}
+.karteikarte{border:1px solid var(--line);border-radius:var(--radius);padding:12px;display:grid;gap:8px;box-shadow:var(--shadow)}
+.karteikarte h3{margin:0;font-size:14px}
+.paar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gebiet-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.gebiet-zeile small{color:var(--muted)}
+.x{border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px}
+.hinweis{color:var(--muted);font-size:12px;margin:0}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;overflow:auto;margin:0;white-space:pre-wrap}
+label.fein{font-size:12px;color:var(--muted);display:grid;gap:4px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.vorschlaege{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.vorschlaege button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
+.vorschlaege button:last-child{border-bottom:0}
+.leer{padding:24px 16px;color:var(--muted);text-align:center}
+/* Preisschilder auf der Karte */
+.preis{background:#fff;color:#1d211c;border:2px solid #2f7d32;border-radius:999px;padding:1px 7px;font:700 12px/18px system-ui,sans-serif;
+  white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translate(-50%,-50%);display:inline-block;font-variant-numeric:tabular-nums}
+.preis.neu{border-color:#d9822b;background:#d9822b;color:#fff}
+.preis.ca{border-style:dashed}
+.preis.aktiv{background:#1d211c;border-color:#1d211c;color:#fff;z-index:1000}
+.leaflet-div-icon.pin{background:none;border:0}
+.leaflet-popup-content{font:13px/1.45 system-ui,sans-serif;margin:0;width:280px!important}
+.pop img{width:100%;height:150px;object-fit:cover;display:block;border-radius:12px 12px 0 0}
+.pop .inhalt{padding:10px 14px 12px}
+.pop h4{margin:0 0 4px;font-size:14px}
+.pop .preiszeile{font-size:16px;font-weight:700;margin-bottom:2px}
+.pop .ort{color:#666;margin-bottom:8px}
+.pop a{color:#2f7d32;font-weight:600;margin-right:10px}
+@media (max-width:760px){
+  body{grid-template-columns:100%;grid-template-rows:46vh 1fr}
+  #karte{grid-row:1;height:46vh}
+  #seite{grid-row:2;border-right:0;border-top:1px solid var(--line)}
+  header{padding:10px 16px 6px}
+  h1{font-size:16px}
+}
+</style>
+</head>
+<body>
+<aside id="seite">
+  <header>
+    <h1><span class="logo"><svg width="14" height="14" viewBox="0 0 32 32"><path d="M4 28V13l12-9 12 9v15h-8v-9h-8v9z" fill="#fff"/></svg></span>Immosuche</h1>
+    <div class="stand" id="stand">Lade Daten …</div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="liste">Wohnungen</button>
+    <button role="tab" aria-selected="false" data-tab="suche">Meine Suche</button>
+  </nav>
+
+  <section class="bereich" id="tab-liste">
+    <div class="filter">
+      <input type="search" id="text" placeholder="Suche: Ort, Strasse, Titel …">
+      <div class="zeile" id="quellen"></div>
+      <div class="zeile">
+        <select id="seit" aria-label="Erfasst seit">
+          <option value="0">Alle</option>
+          <option value="1">Neu seit gestern</option>
+          <option value="3">Neu seit 3 Tagen</option>
+          <option value="7">Neu seit 7 Tagen</option>
+        </select>
+        <select id="zimmer" aria-label="Zimmer">
+          <option value="0">Zimmer: alle</option>
+          <option value="2">ab 2 Zimmer</option><option value="2.5">ab 2.5</option>
+          <option value="3">ab 3 Zimmer</option><option value="3.5">ab 3.5</option>
+          <option value="4">ab 4 Zimmer</option><option value="4.5">ab 4.5</option><option value="5">ab 5 Zimmer</option>
+        </select>
+        <select id="sortierung" aria-label="Sortierung">
+          <option value="neu">Neueste zuerst</option>
+          <option value="preis">Preis aufsteigend</option>
+          <option value="preis-">Preis absteigend</option>
+          <option value="flaeche-">Grösste zuerst</option>
+          <option value="m2">Preis pro m²</option>
+        </select>
+      </div>
+      <label class="fein">Preis bis: <strong id="preisWert">alle</strong>
+        <input type="range" id="preis" min="0" max="100" step="1" value="100"></label>
+    </div>
+    <div class="anzahl" id="anzahl"></div>
+    <ul class="liste" id="liste"></ul>
+    <button class="knopf leise mehr" id="mehr" hidden>Weitere anzeigen</button>
+  </section>
+
+  <section class="bereich" id="tab-suche" hidden>
+    <div class="gebiete">
+      <p class="hinweis">Hier legst du fest, was die tägliche Suche findet. Änderungen bleiben in diesem Browser, bis du sie unten übernimmst.</p>
+
+      <div class="karteikarte">
+        <h3>Gebiete</h3>
+        <div id="gebietListe"></div>
+        <input type="text" id="adresse" placeholder="Ort oder Adresse suchen …" autocomplete="off">
+        <div class="vorschlaege" id="vorschlaege" hidden></div>
+        <p class="hinweis">Oder auf die Karte tippen, um den Mittelpunkt zu setzen.</p>
+        <label class="fein">Umkreis: <strong id="radiusWert">3 km</strong>
+          <input type="range" id="radius" min="0.5" max="20" step="0.5" value="3"></label>
+        <input type="text" id="kreisName" placeholder="Name, z. B. Kreis 6">
+        <button class="knopf" id="kreisSpeichern" disabled>Gebiet hinzufügen</button>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Objekt</h3>
+        <div class="zeile">
+          <button class="chip" data-angebot="RENT">Mieten</button>
+          <button class="chip" data-angebot="SALE">Kaufen</button>
+        </div>
+        <div class="zeile">
+          <button class="chip" data-kat="APARTMENT">Wohnung</button>
+          <button class="chip" data-kat="HOUSE">Haus</button>
+          <button class="chip" data-kat="SHARED">WG-Zimmer</button>
+        </div>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Eckdaten</h3>
+        <div class="paar">
+          <label class="fein">Preis ab (CHF)<input type="number" id="k_preis_min" min="0" step="50"></label>
+          <label class="fein">Preis bis (CHF)<input type="number" id="k_preis_max" min="0" step="50"></label>
+          <label class="fein">Zimmer ab<input type="number" id="k_zimmer_min" min="1" step="0.5"></label>
+          <label class="fein">Zimmer bis<input type="number" id="k_zimmer_max" min="1" step="0.5"></label>
+          <label class="fein">Fläche ab (m²)<input type="number" id="k_flaeche_min" min="0" step="5"></label>
+          <label class="fein">Fläche bis (m²)<input type="number" id="k_flaeche_max" min="0" step="5"></label>
+        </div>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Muss haben</h3>
+        <div class="zeile" id="merkmale"></div>
+        <p class="hinweis">Nur Inserate, die alle gewählten Merkmale ausdrücklich angeben (gilt für Flatfox; Portal-Suchabos filtern selbst).</p>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Ausschliessen</h3>
+        <input type="text" id="k_ausschluss" placeholder="Wörter, durch Komma getrennt">
+        <p class="hinweis">Inserate mit diesen Begriffen in Titel oder Beschreibung werden verworfen.</p>
+      </div>
+
+      <div class="karteikarte">
+        <h3>Für die tägliche Suche übernehmen</h3>
+        <p class="hinweis">Ein Klick öffnet GitHub mit allem fertig ausgefüllt; dort nur noch <b>Commit changes</b> und nochmals <b>Commit changes</b> drücken. Kurz darauf läuft die Suche mit den neuen Kriterien, und neue Treffer kommen per E-Mail.</p>
+        <div class="zeile">
+          <button class="knopf" id="uebernehmen">Suche übernehmen</button>
+          <button class="knopf leise" id="zuruecksetzen">Auf aktive Suche zurücksetzen</button>
+        </div>
+        <details><summary class="hinweis">Inhalt anzeigen</summary><pre id="yaml"></pre>
+          <button class="knopf leise" id="kopieren" style="margin-top:8px">Kopieren</button></details>
+      </div>
+    </div>
+  </section>
+</aside>
+<main id="karte"></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+const ENTWURF = "immosuche.entwurf.v1";
+const REPO = location.hostname.endsWith(".github.io")
+  ? `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0] || "immosuche"}`
+  : "bopsinger/immosuche";
+const MERKMALE = { balconygarden: "Balkon/Garten", lift: "Lift", petsallowed: "Haustiere", parkingspace: "Parkplatz",
+  garage: "Garage", dishwasher: "Geschirrspüler", washingmachine: "Waschmaschine", view: "Aussicht",
+  accessiblewithwheelchair: "Rollstuhlgängig", minergie: "Minergie", fireplace: "Cheminée" };
+const heute = new Date(); heute.setHours(0, 0, 0, 0);
+
+const zustand = { inserate: [], quellen: new Set(), alleQuellen: [], seit: 0, zimmer: 0, preisMax: null,
+  text: "", sortierung: "neu", sichtbar: 100, aktiv: null, aktiveSuche: null, suche: null };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+const chf = (p) => p ? "CHF " + Math.round(p).toLocaleString("de-CH") : "Preis auf Anfrage";
+const kurz = (p) => !p ? "?" : p >= 10000 ? (p / 1e6 >= 1 ? (p / 1e6).toFixed(2).replace(/\.?0+$/, "") + " Mio" : Math.round(p / 1000) + "k") : Math.round(p).toLocaleString("de-CH");
+const datum = (iso) => iso && /^\d{4}-\d\d-\d\d/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : iso || "";
+const alterTage = (iso) => Math.round((heute - new Date(iso + "T00:00:00")) / 864e5);
+const istNeu = (w) => alterTage(w.e) <= 1;
+function fakten(w) {
+  const t = [];
+  if (w.z) t.push(`${w.z} Zi.`);
+  if (w.f) t.push(`${Math.round(w.f)} m²`);
+  return t.join(" · ");
+}
+const ort = (w) => [w.s, `${w.plz || ""} ${w.o || ""}`.trim()].filter(Boolean).join(", ");
+
+// ---------- Karte ----------
+const karte = L.map("karte", { zoomControl: true }).setView([47.37, 8.54], 12);
+const swisstopo = (layer, ext) => L.tileLayer(
+  `https://wmts.geo.admin.ch/1.0.0/${layer}/default/current/3857/{z}/{x}/{y}.${ext}`,
+  { maxZoom: 19, maxNativeZoom: 18, attribution: '&copy; <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a>' });
+const grau = swisstopo("ch.swisstopo.pixelkarte-grau", "jpeg").addTo(karte);
+L.control.layers({ "Landeskarte grau": grau, "Landeskarte farbig": swisstopo("ch.swisstopo.pixelkarte-farbe", "jpeg"),
+  "Luftbild": swisstopo("ch.swisstopo.swissimage", "jpeg") }, null, { position: "topright" }).addTo(karte);
+const gebietEbene = L.layerGroup().addTo(karte);
+const punkte = L.layerGroup().addTo(karte);
+let entwurf = null;
+
+function popup(w) {
+  const auch = (w.a || []).map((x) => `<a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.q)}</a>`).join("");
+  return `<div class="pop">${w.b ? `<img src="${esc(w.b)}" alt="" loading="lazy">` : ""}<div class="inhalt">
+    <div class="preiszeile">${chf(w.p)}</div>
+    <h4>${esc(w.t || "Inserat")}</h4>
+    <div>${esc(fakten(w))}${w.v ? ` · ab ${esc(datum(w.v))}` : ""}</div>
+    <div class="ort">${esc(ort(w))}${w.ca ? " <em>(Lage ungefähr)</em>" : ""}</div>
+    <a href="${esc(w.u)}" target="_blank" rel="noopener">Auf ${esc(w.q)} öffnen</a>${auch}
+  </div></div>`;
+}
+
+// ---------- Filter und Darstellung ----------
+function gefiltert() {
+  const q = norm(zustand.text).trim();
+  const l = zustand.inserate.filter((w) => {
+    if (!zustand.quellen.has(w.q)) return false;
+    if (zustand.seit && alterTage(w.e) > zustand.seit) return false;
+    if (zustand.zimmer && !(w.z >= zustand.zimmer)) return false;
+    if (zustand.preisMax != null && w.p && w.p > zustand.preisMax) return false;
+    if (q && !norm(`${w.t} ${w.s} ${w.plz} ${w.o} ${w.q}`).includes(q)) return false;
+    return true;
+  });
+  const s = zustand.sortierung, inf = Infinity;
+  const k = { neu: (w) => -new Date(w.e), preis: (w) => w.p || inf, "preis-": (w) => -(w.p || 0),
+    "flaeche-": (w) => -(w.f || 0), m2: (w) => w.p && w.f ? w.p / w.f : inf }[s];
+  return l.sort((a, b) => k(a) - k(b) || (a.p || inf) - (b.p || inf));
+}
+
+const marker = new Map();
+function zeichnen(passend = false) {
+  const liste = gefiltert();
+  punkte.clearLayers(); marker.clear();
+  for (const w of liste) {
+    if (w.lat == null) continue;
+    const icon = L.divIcon({ className: "pin", iconSize: null,
+      html: `<span class="preis${istNeu(w) ? " neu" : ""}${w.ca ? " ca" : ""}${w.id === zustand.aktiv ? " aktiv" : ""}">${kurz(w.p)}</span>` });
+    const m = L.marker([w.lat, w.lon], { icon, zIndexOffset: istNeu(w) ? 500 : 0, riseOnHover: true })
+      .bindPopup(() => popup(w), { maxWidth: 300, minWidth: 280 });
+    m.on("click", () => markieren(w.id, false));
+    m.addTo(punkte); marker.set(w.id, m);
+  }
+  const neu = liste.filter(istNeu).length;
+  $("anzahl").textContent = `${liste.length} Wohnung${liste.length === 1 ? "" : "en"} · ${neu} neu seit gestern`;
+  const ul = $("liste"); ul.innerHTML = "";
+  if (!liste.length) ul.innerHTML = `<li class="leer" style="display:block">Keine Wohnungen für diese Filter.</li>`;
+  for (const w of liste.slice(0, zustand.sichtbar)) {
+    const li = document.createElement("li");
+    li.dataset.id = w.id;
+    if (w.id === zustand.aktiv) li.className = "aktiv";
+    const bild = w.b ? `style="background-image:url('${esc(w.b).replace(/'/g, "%27")}')"` : "";
+    li.innerHTML = `<div class="bild" ${bild}>${w.b ? "" : "⌂"}</div><div>
+      <div class="titel">${esc(w.t || "Inserat")}</div>
+      <div class="fakten"><b>${chf(w.p)}</b>${fakten(w) ? " · " + esc(fakten(w)) : ""}</div>
+      <div class="meta"><span>${esc(ort(w))}</span></div>
+      <div class="meta">${istNeu(w) ? `<span class="badge neu">Neu</span>` : `<span>erfasst ${datum(w.e)}</span>`}
+        <span class="badge quelle">${esc(w.q)}</span>${(w.a || []).map((x) => `<span class="badge auch">auch ${esc(x.q)}</span>`).join("")}
+        ${w.v ? `<span>ab ${esc(datum(w.v))}</span>` : ""}</div></div>`;
+    li.addEventListener("click", () => markieren(w.id, true));
+    ul.appendChild(li);
+  }
+  $("mehr").hidden = liste.length <= zustand.sichtbar;
+  if (passend) {
+    const b = L.latLngBounds(liste.filter((w) => w.lat != null).map((w) => [w.lat, w.lon]));
+    if (b.isValid()) karte.fitBounds(b, { padding: [40, 40], maxZoom: 15 });
+  }
+}
+function markieren(id, fliegen) {
+  const vorher = zustand.aktiv; zustand.aktiv = id;
+  for (const x of [vorher, id]) {
+    const m = marker.get(x); const el = m && m.getElement() && m.getElement().querySelector(".preis");
+    if (el) el.classList.toggle("aktiv", x === id);
+  }
+  document.querySelectorAll("#liste li").forEach((li) => li.classList.toggle("aktiv", li.dataset.id === id));
+  const m = marker.get(id);
+  if (m && fliegen) { karte.flyTo(m.getLatLng(), Math.max(karte.getZoom(), 15), { duration: .6 }); setTimeout(() => m.openPopup(), 650); }
+  const li = document.querySelector(`#liste li[data-id="${CSS.escape(id)}"]`);
+  if (li && !fliegen) li.scrollIntoView({ block: "nearest" });
+}
+
+// ---------- Meine Suche ----------
+function ladeEntwurf() { try { return JSON.parse(localStorage.getItem(ENTWURF)); } catch { return null; } }
+function sichern() { try { localStorage.setItem(ENTWURF, JSON.stringify(zustand.suche)); } catch {} }
+const kopie = (o) => JSON.parse(JSON.stringify(o));
+
+function gebieteZeichnen() {
+  gebietEbene.clearLayers();
+  for (const o of zustand.suche.orte || []) {
+    if (o.lat == null) continue;
+    L.circle([o.lat, o.lon], { radius: (o.umkreis_km || 3) * 1000, color: "#d9822b", weight: 2, fillOpacity: .05, interactive: false })
+      .addTo(gebietEbene);
+  }
+  if (entwurf) entwurf.kreis.addTo(gebietEbene);
+  const box = $("gebietListe");
+  box.innerHTML = (zustand.suche.orte || []).length ? "" : `<p class="hinweis">Noch keine Gebiete.</p>`;
+  (zustand.suche.orte || []).forEach((o, i) => {
+    const d = document.createElement("div");
+    d.className = "gebiet-zeile";
+    d.innerHTML = `<div><strong>${esc(o.name)}</strong><br><small>Umkreis ${String(o.umkreis_km).replace(".", ",")} km</small></div>`;
+    const zeig = document.createElement("button"); zeig.className = "knopf leise"; zeig.textContent = "Zeigen";
+    zeig.onclick = () => o.lat != null && karte.flyToBounds(L.latLng(o.lat, o.lon).toBounds(o.umkreis_km * 2000), { padding: [20, 20] });
+    const x = document.createElement("button"); x.className = "x"; x.title = "Entfernen"; x.textContent = "×";
+    x.onclick = () => { zustand.suche.orte.splice(i, 1); geaendert(); };
+    const r = document.createElement("div"); r.className = "zeile"; r.append(zeig, x); d.append(r);
+    box.appendChild(d);
+  });
+}
+
+const FELDER = ["preis_min", "preis_max", "zimmer_min", "zimmer_max", "flaeche_min", "flaeche_max"];
+function formularFuellen() {
+  const s = zustand.suche;
+  document.querySelectorAll("[data-angebot]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.angebot === (s.angebot || "RENT")));
+  document.querySelectorAll("[data-kat]").forEach((b) => b.setAttribute("aria-pressed", (s.kategorien || []).includes(b.dataset.kat)));
+  for (const f of FELDER) $("k_" + f).value = s[f] ?? "";
+  $("k_ausschluss").value = (s.ausschluss_woerter || []).join(", ");
+  const box = $("merkmale"); box.innerHTML = "";
+  for (const [k, name] of Object.entries(MERKMALE)) {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = name;
+    b.setAttribute("aria-pressed", (s.merkmale_pflicht || []).includes(k));
+    b.onclick = () => {
+      const m = new Set(s.merkmale_pflicht || []); m.has(k) ? m.delete(k) : m.add(k);
+      s.merkmale_pflicht = [...m]; b.setAttribute("aria-pressed", m.has(k)); geaendert(false);
+    };
+    box.appendChild(b);
+  }
+  gebieteZeichnen(); $("yaml").textContent = yaml();
+}
+function geaendert(neuZeichnen = true) { sichern(); if (neuZeichnen) gebieteZeichnen(); $("yaml").textContent = yaml(); }
+
+document.querySelectorAll("[data-angebot]").forEach((b) => b.onclick = () => { zustand.suche.angebot = b.dataset.angebot; formularFuellen(); sichern(); });
+document.querySelectorAll("[data-kat]").forEach((b) => b.onclick = () => {
+  const k = new Set(zustand.suche.kategorien || []); k.has(b.dataset.kat) ? k.delete(b.dataset.kat) : k.add(b.dataset.kat);
+  zustand.suche.kategorien = [...k]; b.setAttribute("aria-pressed", k.has(b.dataset.kat)); geaendert(false);
+});
+for (const f of FELDER) $("k_" + f).addEventListener("input", (e) => {
+  const v = e.target.value.trim(); zustand.suche[f] = v === "" ? null : +v; geaendert(false);
+});
+$("k_ausschluss").addEventListener("input", (e) => {
+  zustand.suche.ausschluss_woerter = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); geaendert(false);
+});
+
+function yaml() {
+  const s = zustand.suche, q = (x) => JSON.stringify(x), n = (x) => x == null ? "null" : String(x);
+  const liste = (a) => `[${(a || []).map(q).join(", ")}]`;
+  return `# Erstellt mit der Immosuche-Karte am ${new Date().toLocaleDateString("de-CH")}.
+# Es gilt immer die neueste Datei im Ordner suche/.
+suche:
+  angebot: ${s.angebot || "RENT"}
+  kategorien: ${liste(s.kategorien)}
+  orte:
+${(s.orte || []).map((o) => `    - name: ${q(o.name)}\n      lat: ${(+o.lat).toFixed(6)}\n      lon: ${(+o.lon).toFixed(6)}\n      umkreis_km: ${o.umkreis_km}`).join("\n") || "    []"}
+${FELDER.map((f) => `  ${f}: ${n(s[f])}`).join("\n")}
+  merkmale_pflicht: ${liste(s.merkmale_pflicht)}
+  ausschluss_woerter: ${liste(s.ausschluss_woerter)}
+`;
+}
+
+function entwurfSetzen(lat, lon) {
+  const r = +$("radius").value * 1000;
+  if (entwurf) { entwurf.lat = lat; entwurf.lon = lon; entwurf.kreis.setLatLng([lat, lon]); }
+  else entwurf = { lat, lon, kreis: L.circle([lat, lon], { radius: r, color: "#d9822b", dashArray: "6 6", weight: 2, fillOpacity: .12 }) };
+  gebieteZeichnen();
+  $("kreisSpeichern").disabled = false;
+  karte.fitBounds(entwurf.kreis.getBounds(), { padding: [40, 40] });
+}
+karte.on("click", (e) => { if (aktuellerTab === "suche") entwurfSetzen(e.latlng.lat, e.latlng.lng); });
+$("radius").addEventListener("input", () => {
+  $("radiusWert").textContent = `${String($("radius").value).replace(".", ",")} km`;
+  if (entwurf) entwurf.kreis.setRadius(+$("radius").value * 1000);
+});
+$("kreisSpeichern").onclick = () => {
+  if (!entwurf) return;
+  (zustand.suche.orte ||= []).push({ name: $("kreisName").value.trim() || `Gebiet ${zustand.suche.orte.length + 1}`,
+    lat: +entwurf.lat.toFixed(6), lon: +entwurf.lon.toFixed(6), umkreis_km: +$("radius").value });
+  entwurf = null; $("kreisName").value = ""; $("adresse").value = ""; $("kreisSpeichern").disabled = true;
+  geaendert();
+};
+$("uebernehmen").onclick = () => {
+  if (!(zustand.suche.orte || []).length) { alert("Bitte zuerst mindestens ein Gebiet anlegen."); return; }
+  const z = new Date(), p = (x) => String(x).padStart(2, "0");
+  const name = `suche/${z.getFullYear()}-${p(z.getMonth() + 1)}-${p(z.getDate())}_${p(z.getHours())}${p(z.getMinutes())}${p(z.getSeconds())}.yaml`;
+  const url = `https://github.com/${REPO}/new/main?filename=${encodeURIComponent(name)}`
+    + `&value=${encodeURIComponent(yaml())}&message=${encodeURIComponent("Suche von der Karte übernommen")}`;
+  window.open(url, "_blank", "noopener");
+};
+$("zuruecksetzen").onclick = () => {
+  if (!confirm("Entwurf verwerfen und die aktive Suche laden?")) return;
+  zustand.suche = kopie(zustand.aktiveSuche); try { localStorage.removeItem(ENTWURF); } catch {}
+  entwurf = null; formularFuellen();
+};
+$("kopieren").onclick = async () => {
+  try { await navigator.clipboard.writeText(yaml()); $("kopieren").textContent = "Kopiert"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("yaml")); getSelection().removeAllRanges(); getSelection().addRange(r); $("kopieren").textContent = "Markiert, bitte kopieren"; }
+  setTimeout(() => ($("kopieren").textContent = "Kopieren"), 2000);
+};
+
+// Ortssuche über geo.admin.ch
+let suchTimer;
+$("adresse").addEventListener("input", () => {
+  clearTimeout(suchTimer);
+  const q = $("adresse").value.trim();
+  if (q.length < 3) { $("vorschlaege").hidden = true; return; }
+  suchTimer = setTimeout(async () => {
+    try {
+      const u = `https://api3.geo.admin.ch/rest/services/api/SearchServer?type=locations&sr=4326&limit=6&searchText=${encodeURIComponent(q)}`;
+      const t = (await (await fetch(u)).json()).results || [];
+      const box = $("vorschlaege"); box.innerHTML = "";
+      for (const r of t) {
+        const b = document.createElement("button");
+        b.innerHTML = r.attrs.label; // vom Bund geliefert, enthält nur <b>
+        b.textContent = b.textContent;
+        b.onclick = () => { $("adresse").value = b.textContent; box.hidden = true; entwurfSetzen(r.attrs.lat, r.attrs.lon);
+          if (!$("kreisName").value) $("kreisName").value = b.textContent.replace(/\s*\(.*\)$/, "").split(" ").slice(0, 3).join(" "); };
+        box.appendChild(b);
+      }
+      box.hidden = !t.length;
+    } catch { $("vorschlaege").hidden = true; }
+  }, 250);
+});
+
+// ---------- Bedienelemente ----------
+let aktuellerTab = "liste";
+function tab(name) {
+  aktuellerTab = name;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name));
+  $("tab-liste").hidden = name !== "liste"; $("tab-suche").hidden = name !== "suche";
+  karte.getContainer().style.cursor = name === "suche" ? "crosshair" : "";
+  if (name === "suche") { const b = gebietEbene.getLayers().filter((l) => l.getBounds).map((l) => l.getBounds());
+    if (b.length) karte.fitBounds(b.reduce((a, c) => a.extend(c)), { padding: [30, 30] }); }
+}
+document.querySelectorAll("nav.tabs button").forEach((b) => b.onclick = () => tab(b.dataset.tab));
+const neuFiltern = () => { zustand.sichtbar = 100; zeichnen(true); };
+$("seit").onchange = () => { zustand.seit = +$("seit").value; neuFiltern(); };
+$("zimmer").onchange = () => { zustand.zimmer = +$("zimmer").value; neuFiltern(); };
+$("sortierung").onchange = () => { zustand.sortierung = $("sortierung").value; zustand.sichtbar = 100; zeichnen(); };
+let preisStufen = [];
+$("preis").addEventListener("input", () => {
+  const v = +$("preis").value;
+  zustand.preisMax = v >= preisStufen.length - 1 ? null : preisStufen[v];
+  $("preisWert").textContent = zustand.preisMax == null ? "alle" : chf(zustand.preisMax);
+  clearTimeout(tippTimer); tippTimer = setTimeout(neuFiltern, 120);
+});
+let tippTimer;
+$("text").addEventListener("input", () => { clearTimeout(tippTimer); tippTimer = setTimeout(() => { zustand.text = $("text").value; neuFiltern(); }, 200); });
+$("mehr").onclick = () => { zustand.sichtbar += 100; zeichnen(); };
+
+// ---------- Start ----------
+fetch("daten.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
+  zustand.inserate = d.inserate || [];
+  zustand.alleQuellen = [...new Set(zustand.inserate.map((w) => w.q))].sort();
+  zustand.quellen = new Set(zustand.alleQuellen);
+  const box = $("quellen");
+  for (const q of zustand.alleQuellen) {
+    const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
+    b.textContent = `${q} (${zustand.inserate.filter((w) => w.q === q).length})`;
+    b.onclick = () => { zustand.quellen.has(q) ? zustand.quellen.delete(q) : zustand.quellen.add(q); b.setAttribute("aria-pressed", zustand.quellen.has(q)); neuFiltern(); };
+    box.appendChild(b);
+  }
+  // Preisregler in sinnvollen Stufen zwischen kleinstem und grösstem Preis
+  const preise = zustand.inserate.map((w) => w.p).filter(Boolean).sort((a, b) => a - b);
+  if (preise.length) {
+    const lo = Math.floor(preise[0] / 100) * 100, hi = Math.ceil(preise.at(-1) / 100) * 100;
+    const schritt = hi - lo > 20000 ? 10000 : hi - lo > 3000 ? 100 : 50;
+    for (let x = lo; x < hi; x += schritt) preisStufen.push(x);
+    preisStufen.push(hi);
+    $("preis").max = preisStufen.length - 1; $("preis").value = preisStufen.length - 1;
+  }
+  const s = new Date(d.stand);
+  $("stand").textContent = `${zustand.inserate.length} Inserate aus ${zustand.alleQuellen.length || 0} Quelle${zustand.alleQuellen.length === 1 ? "" : "n"} · Stand ${s.toLocaleDateString("de-CH")} ${s.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}`;
+  zustand.aktiveSuche = d.kriterien || { angebot: "RENT", kategorien: ["APARTMENT"], orte: [] };
+  zustand.suche = ladeEntwurf() || kopie(zustand.aktiveSuche);
+  formularFuellen(); zeichnen(true);
+}).catch(() => { $("stand").textContent = "Daten konnten nicht geladen werden."; });
+</script>
+</body>
+</html>

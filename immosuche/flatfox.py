@@ -88,6 +88,7 @@ def to_listing(d: dict) -> Listing:
         area=_f(d.get("surface_living")) or _f(d.get("space_display")),
         zipcode=str(d.get("zipcode") or ""), city=d.get("city") or "", street=d.get("street") or "",
         image=(BASE + img["url_thumb_m"]) if img.get("url_thumb_m") else "",
+        lat=_f(d.get("latitude")), lon=_f(d.get("longitude")),
         available=d.get("moving_date") or ({"imm": "sofort", "agr": "nach Vereinbarung"}
                                            .get(d.get("moving_date_type") or "", "")),
     )
@@ -123,8 +124,11 @@ def matches(d: dict, crit: dict) -> bool:
     return True
 
 
-def search(crit: dict, known: set[str]) -> tuple[list[Listing], set[str]]:
-    """Liefert (Treffer, verworfene_uids). `known` = bereits gemeldete oder verworfene uids."""
+def search(crit: dict, rejected_before: set[str]) -> tuple[list[Listing], set[str]]:
+    """Liefert (alle aktuell passenden Inserate, neu verworfene uids).
+
+    `rejected_before` = früher bereits als unpassend erkannte uids (werden nicht erneut geladen).
+    """
     s = requests.Session()
     s.headers.update(HEADERS)
     params = {"offer_type": crit.get("angebot", "RENT")}
@@ -135,16 +139,20 @@ def search(crit: dict, known: set[str]) -> tuple[list[Listing], set[str]]:
 
     candidates: dict[int, dict] = {}
     for ort in crit.get("orte") or []:
-        lat, lon = geocode(ort["name"], s)
+        if ort.get("lat") is not None and ort.get("lon") is not None:
+            lat, lon = float(ort["lat"]), float(ort["lon"])
+        else:
+            lat, lon = geocode(ort["name"], s)
+        ort.setdefault("lat", round(lat, 6)); ort.setdefault("lon", round(lon, 6))  # für die Karte
         km = float(ort.get("umkreis_km", 3))
         for p in _pins(s, bbox(lat, lon, km), params):
             if p.get("latitude") and distance_km(lat, lon, p["latitude"], p["longitude"]) <= km:
                 candidates[p["pk"]] = p
-        log.info("Flatfox %s (+%s km): %d Kandidaten bisher", ort["name"], km, len(candidates))
+        log.info("Flatfox %s (+%s km): %d Kandidaten bisher", ort.get("name"), km, len(candidates))
 
-    new_pks = [pk for pk in candidates if f"flatfox:{pk}" not in known]
-    details = _details(s, new_pks)
+    pks = [pk for pk in candidates if f"flatfox:{pk}" not in rejected_before]
+    details = _details(s, pks)
     hits = [to_listing(d) for d in details if matches(d, crit)]
     rejected = {f"flatfox:{d['pk']}" for d in details if not matches(d, crit)}
-    log.info("Flatfox: %d neue Kandidaten, %d Treffer", len(new_pks), len(hits))
+    log.info("Flatfox: %d Kandidaten geprüft, %d passend", len(pks), len(hits))
     return hits, rejected

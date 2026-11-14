@@ -1,5 +1,6 @@
 # Konsolidierte Immobiliensuche: Suchkriterien
-# Nach jeder Änderung einfach committen; der nächste Tageslauf übernimmt sie.
+# Grundeinstellung. Über die Karte (Reiter "Meine Suche") erzeugte Dateien in suche/
+# haben Vorrang: es gilt immer die neueste davon.
 
 suche:
   angebot: RENT              # RENT = mieten, SALE = kaufen
@@ -21,7 +22,7 @@ suche:
 
   # Optional: Inserat muss ALLE diese Merkmale haben
   # (Flatfox-Kennungen, z.B. balconygarden, petsallowed, parkingspace, garage,
-  #  lift, dishwasher, washingmachine, view, wheelchairaccessible)
+  #  lift, dishwasher, washingmachine, view, accessiblewithwheelchair, minergie)
   merkmale_pflicht: []
 
   # Inserate mit einem dieser Begriffe in Titel/Beschreibung werden verworfen

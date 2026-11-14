@@ -1,6 +1,7 @@
-"""Tageslauf: Quellen abfragen, Duplikate entfernen, neue Treffer melden.
+"""Tageslauf: Quellen abfragen, Duplikate entfernen, neue Treffer melden, Kartendaten schreiben.
 
-Aufruf:  python -m immosuche [--dry-run] [--html vorschau.html] [--config config.yaml]
+Aufruf:  python -m immosuche [--dry-run] [--html vorschau.html]
+Kriterien: neueste Datei in suche/*.yaml (von der Karte erzeugt), sonst config.yaml.
 Umgebungsvariablen (GitHub-Secrets):
   MAIL_USER, MAIL_PASSWORD   Konto für Versand (SMTP) und Sammelpostfach (IMAP)
   MAIL_TO                    Empfänger, kommagetrennt
@@ -15,8 +16,10 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+import requests
 import yaml
 
 from . import flatfox, mailbox, notify
@@ -24,44 +27,75 @@ from .models import Listing
 
 log = logging.getLogger("immosuche")
 KEEP_DAYS = 180
+POSTFACH_TAGE = 21   # Inserate aus Portal-Mails so lange auf der Karte zeigen
+
+
+def load_config(root: Path, explicit: str | None) -> tuple[dict, str]:
+    cfg = yaml.safe_load((root / "config.yaml").read_text())
+    source = "config.yaml"
+    files = sorted((root / "suche").glob("*.yaml")) if not explicit else []
+    if explicit:
+        cfg = yaml.safe_load(Path(explicit).read_text())
+        source = explicit
+    elif files:
+        neu = yaml.safe_load(files[-1].read_text()) or {}
+        cfg["suche"] = neu.get("suche", neu)   # Datei darf nur den Abschnitt "suche" enthalten
+        source = str(files[-1].relative_to(root))
+    return cfg, source
 
 
 def load_state(path: Path) -> dict:
-    if path.exists():
-        return json.loads(path.read_text())
-    return {"gemeldet": {}, "verworfen": [], "kriterien": "", "mails": {}, "fingerprints": {}}
+    st = json.loads(path.read_text()) if path.exists() else {}
+    for k, v in {"gemeldet": {}, "verworfen": [], "kriterien": "", "mails": {},
+                 "fingerprints": {}, "postfach": {}}.items():
+        st.setdefault(k, v)
+    return st
 
 
 def save_state(path: Path, st: dict) -> None:
-    cutoff = time.time() - KEEP_DAYS * 86400
+    now = time.time()
     for k in ("gemeldet", "mails"):
-        st[k] = {i: t for i, t in st[k].items() if t >= cutoff}
+        st[k] = {i: t for i, t in st[k].items() if t >= now - KEEP_DAYS * 86400}
     # Portalübergreifende Duplikate nur 30 Tage abgleichen (sonst Fehltreffer bei gleichem Preis)
-    st["fingerprints"] = {i: t for i, t in st["fingerprints"].items() if t >= time.time() - 30 * 86400}
+    st["fingerprints"] = {i: t for i, t in st["fingerprints"].items() if t >= now - 30 * 86400}
+    st["postfach"] = {i: d for i, d in st["postfach"].items() if d.get("_seit", 0) >= now - POSTFACH_TAGE * 86400}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(st, ensure_ascii=False, indent=0, sort_keys=True))
 
 
-def dedupe(items: list[Listing], st: dict) -> tuple[list[Listing], dict[str, list[Listing]]]:
-    """Entfernt bereits gemeldete Inserate und fasst dasselbe Objekt über Portale zusammen."""
+_PLZ: dict[str, tuple[float, float] | None] = {}
+
+
+def plz_mitte(plz: str) -> tuple[float, float] | None:
+    """Ungefähre Lage über den Mittelpunkt der Postleitzahl (geo.admin.ch)."""
+    if plz not in _PLZ:
+        try:
+            r = requests.get(flatfox.GEO, params={"searchText": plz, "type": "locations", "origins": "zipcode",
+                                                  "sr": 4326, "limit": 1}, timeout=20)
+            t = r.json().get("results") or []
+            _PLZ[plz] = (t[0]["attrs"]["lat"], t[0]["attrs"]["lon"]) if t else None
+        except Exception:
+            _PLZ[plz] = None
+    return _PLZ[plz]
+
+
+def group(items: list[Listing]) -> tuple[list[Listing], dict[str, list[Listing]]]:
+    """Fasst dasselbe Objekt über verschiedene Portale zusammen (erstes Vorkommen gewinnt)."""
     out: list[Listing] = []
     also: dict[str, list[Listing]] = {}
     by_fp: dict[str, Listing] = {}
     by_extra: dict[str, Listing] = {}
+    uids: set[str] = set()
     for l in items:
-        if l.uid in st["gemeldet"]:
+        if l.uid in uids:
             continue
         fp = l.fingerprint()
-        if fp and fp in st["fingerprints"]:          # bereits früher über ein anderes Portal gemeldet
-            st["gemeldet"][l.uid] = time.time()
-            continue
         first = (fp and by_fp.get(fp)) or next((by_extra[e] for e in l.extra_ids if e in by_extra), None)
         if first is not None and first.source != l.source:  # gleiche Quelle: eigenständige Inserate
             if l.uid not in {d.uid for d in also.get(first.uid, [])}:
                 also.setdefault(first.uid, []).append(l)
             continue
-        if any(o.uid == l.uid for o in out):
-            continue
+        uids.add(l.uid)
         out.append(l)
         if fp and fp not in by_fp:
             by_fp[fp] = l
@@ -70,34 +104,55 @@ def dedupe(items: list[Listing], st: dict) -> tuple[list[Listing], dict[str, lis
     return out, also
 
 
+def dedupe(items: list[Listing], st: dict) -> tuple[list[Listing], dict[str, list[Listing]]]:
+    """Nur neue Inserate (noch nie gemeldet), portalübergreifend zusammengefasst."""
+    fresh = [l for l in items if l.uid not in st["gemeldet"]
+             and not (l.fingerprint() and l.fingerprint() in st["fingerprints"])]
+    return group(fresh)
+
+
+def kartendaten(listings: list[Listing], also: dict[str, list[Listing]], st: dict, crit: dict, quelle: str) -> dict:
+    def eintrag(l: Listing) -> dict:
+        d = {"id": l.uid, "q": l.source, "t": l.title, "u": l.url, "p": l.price, "z": l.rooms, "f": l.area,
+             "plz": l.zipcode, "o": l.city, "s": l.street, "b": l.image, "v": l.available,
+             "lat": round(l.lat, 6) if l.lat else None, "lon": round(l.lon, 6) if l.lon else None,
+             "ca": 1 if l.approx else None,
+             "e": datetime.fromtimestamp(st["gemeldet"].get(l.uid, time.time()), timezone.utc).date().isoformat(),
+             "a": [{"q": d.source, "u": d.url} for d in also.get(l.uid, [])] or None}
+        return {k: v for k, v in d.items() if v not in (None, "")}
+    return {"stand": datetime.now(timezone.utc).isoformat(timespec="minutes"), "quelle": quelle,
+            "kriterien": crit, "inserate": sorted((eintrag(l) for l in listings), key=lambda e: e["e"], reverse=True)}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="config.yaml")
-    ap.add_argument("--state", default="state/state.json")
-    ap.add_argument("--dry-run", action="store_true", help="keine Mail senden, Zustand nicht speichern")
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--config", help="bestimmte Konfigurationsdatei statt suche/ bzw. config.yaml")
+    ap.add_argument("--dry-run", action="store_true", help="keine Mail senden, nichts speichern")
     ap.add_argument("--html", help="Mailvorschau in diese Datei schreiben")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    cfg = yaml.safe_load(Path(args.config).read_text())
+    root = Path(args.root)
+    cfg, quelle = load_config(root, args.config)
     crit, notif, src = cfg["suche"], cfg.get("benachrichtigung", {}), cfg.get("quellen", {})
-    state_path = Path(args.state)
+    log.info("Kriterien aus %s", quelle)
+    state_path = root / "state" / "state.json"
     st = load_state(state_path)
 
     crit_hash = hashlib.sha1(json.dumps(crit, sort_keys=True).encode()).hexdigest()
-    if st.get("kriterien") != crit_hash:
+    if st["kriterien"] != crit_hash:
         log.info("Suchkriterien geändert: verworfene Inserate werden neu geprüft")
         st["verworfen"], st["kriterien"] = [], crit_hash
 
     user, pw = os.environ.get("MAIL_USER", ""), os.environ.get("MAIL_PASSWORD", "")
-    found: list[Listing] = []
+    aktuell: list[Listing] = []   # alles, was derzeit passt (für die Karte)
     errors: list[str] = []
 
     if src.get("flatfox", True):
         try:
-            known = set(st["gemeldet"]) | set(st["verworfen"])
-            hits, rejected = flatfox.search(crit, known)
-            found += hits
+            hits, rejected = flatfox.search(crit, set(st["verworfen"]))
+            aktuell += hits
             st["verworfen"] = sorted(set(st["verworfen"]) | rejected)
         except Exception as e:  # eine fehlerhafte Quelle soll den Lauf nicht abbrechen
             log.exception("Flatfox fehlgeschlagen")
@@ -109,55 +164,68 @@ def main() -> int:
         try:
             items, new_mails = mailbox.fetch(pcfg, os.environ.get("IMAP_HOST", "imap.gmail.com"),
                                              user, pw, set(st["mails"]))
-            found += items
+            now = time.time()
+            for l in items:
+                if l.lat is None and l.zipcode and (m := plz_mitte(l.zipcode)):
+                    l.lat, l.lon, l.approx = m[0], m[1], True
+                st["postfach"].setdefault(l.uid, {**l.to_dict(), "_seit": now})
         except Exception as e:
             log.exception("Postfach fehlgeschlagen")
             errors.append(f"Postfach: {e}")
     elif pcfg.get("aktiv"):
         log.warning("Postfach aktiv, aber MAIL_USER/MAIL_PASSWORD fehlen; übersprungen")
+    aktuell += [Listing.from_dict(d) for d in st["postfach"].values()]
 
-    new, also = dedupe(found, st)
-    log.info("Insgesamt %d neue Treffer (%d Duplikate zusammengefasst)", len(new), sum(map(len, also.values())))
+    new, also_new = dedupe(aktuell, st)
+    log.info("%d aktuell passend, davon %d neu", len(aktuell), len(new))
 
     shown = new[: int(notif.get("max_treffer_pro_mail", 60))]
-    text, body = notify.render(shown, also)
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    karte = os.environ.get("KARTE_URL") or (f"https://{repo.split('/')[0]}.github.io/{repo.split('/')[1]}/" if "/" in repo else "")
+    text, body = notify.render(shown, also_new, karte)
     if len(new) > len(shown):
-        note = f"\n… und {len(new) - len(shown)} weitere (werden beim nächsten Lauf nicht erneut gemeldet)."
-        text += note
-        body = body.replace("</div>", f"<p>{note.strip()}</p></div>", 1)
+        note = f"… und {len(new) - len(shown)} weitere, alle auf der Karte."
+        text += "\n" + note
+        body = body.replace("<!--ende-->", f"<p>{note}</p><!--ende-->", 1)
     if errors:
         text += "\n\nHinweise: " + "; ".join(errors)
-        body = body.replace("</div>", f'<p style="color:#b00">Hinweise: {"; ".join(errors)}</p></div>', 1)
+        body = body.replace("<!--ende-->", f'<p style="color:#b00">Hinweise: {"; ".join(errors)}</p><!--ende-->', 1)
     if args.html:
         Path(args.html).write_text(body)
 
-    should_send = bool(new) or not notif.get("nur_bei_treffern", True) or (errors and not new)
     if args.dry_run:
         print(text)
         return 0
 
+    should_send = bool(new) or not notif.get("nur_bei_treffern", True) or bool(errors)
+    zugestellt = not should_send
     if should_send:
         to = [a.strip() for a in os.environ.get("MAIL_TO", "").split(",") if a.strip()]
         if not (to and user and pw):
-            log.error("MAIL_TO, MAIL_USER oder MAIL_PASSWORD fehlt; keine Mail versendet")
-            return 1
-        subject = notif.get("betreff", "Immosuche: {anzahl} neue Treffer").format(anzahl=len(new))
-        if errors and not new:
-            subject = "Immosuche: Fehler beim Tageslauf"
-        notify.send(subject, text, body, to, os.environ.get("SMTP_HOST", "smtp.gmail.com"),
-                    int(os.environ.get("SMTP_PORT", "465")), user, pw, os.environ.get("MAIL_FROM"))
-        log.info("Mail an %d Empfänger versendet", len(to))
+            log.warning("MAIL_TO, MAIL_USER oder MAIL_PASSWORD fehlt; keine Mail versendet")
+        else:
+            subject = notif.get("betreff", "Immosuche: {anzahl} neue Treffer").format(anzahl=len(new))
+            if errors and not new:
+                subject = "Immosuche: Fehler beim Tageslauf"
+            notify.send(subject, text, body, to, os.environ.get("SMTP_HOST", "smtp.gmail.com"),
+                        int(os.environ.get("SMTP_PORT", "465")), user, pw, os.environ.get("MAIL_FROM"))
+            log.info("Mail an %d Empfänger versendet", len(to))
+            zugestellt = True
 
     now = time.time()
-    for l in new:
+    for l in (new if zugestellt else []):  # ohne Versand beim nächsten Lauf erneut melden
         st["gemeldet"][l.uid] = now
         if fp := l.fingerprint():
             st["fingerprints"][fp] = now
-    for dups in also.values():
+    for dups in (also_new.values() if zugestellt else []):
         for d in dups:
-            st["gemeldet"][d.uid] = now
+            st["gemeldet"].setdefault(d.uid, now)
     for m in new_mails:
         st["mails"][m] = now
+
+    alle, also_alle = group(aktuell)
+    (root / "daten.json").write_text(json.dumps(kartendaten(alle, also_alle, st, crit, quelle),
+                                                ensure_ascii=False, separators=(",", ":")))
     save_state(state_path, st)
     return 0
 
