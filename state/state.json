@@ -102,6 +102,7 @@
 "standard|2200|3.5|8810": 1794654807.6014493,
 "standard|2225|3.5|8810": 1794836326.535194,
 "standard|2250|3.5|8706": 1794654807.6014493,
+"standard|2290|3.5|8136": 1795010274.972845,
 "standard|2350|2.5|8804": 1794654807.6014493,
 "standard|2350|2.5|8820": 1794654807.6014493,
 "standard|2350|4.5|8804": 1794654807.6014493,
@@ -215,6 +216,7 @@
 "standard|flatfox:86469541": 1794651848.8147666,
 "standard|flatfox:86469563": 1794650351.533633,
 "standard|flatfox:86469903": 1794651848.8147666,
+"standard|flatfox:86471294": 1795010274.972845,
 "standard|flatfox:86473224": 1794651848.8147666,
 "standard|flatfox:86476674": 1794650351.533633,
 "standard|flatfox:86476888": 1794651848.8147666,
@@ -314,13 +316,13 @@
 "postfach": {},
 "postfach_status": {
 "fehler": "",
-"geprueft": 1794925413.2169826,
+"geprueft": 1795010274.972845,
 "ok": true
 },
 "suchen": {
 "standard": {
-"letzte_mail": "2026-11-17T14:23+00:00",
-"letzte_mail_anzahl": 7
+"letzte_mail": "2026-11-18T13:57+00:00",
+"letzte_mail_anzahl": 1
 },
 "v9dffa": {
 "letzte_mail": "2026-11-14T11:02+00:00",
@@ -332,6 +334,7 @@
 "hash": "65b3eca77770f19f3b89be51f34f8831687e24ae",
 "ids": [
 "flatfox:1392635",
+"flatfox:1612779",
 "flatfox:1708993",
 "flatfox:72643315",
 "flatfox:72643817",
@@ -434,6 +437,7 @@
 "flatfox:86424024",
 "flatfox:86426115",
 "flatfox:86430021",
+"flatfox:86430088",
 "flatfox:86430872",
 "flatfox:86431668",
 "flatfox:86432396",
@@ -670,7 +674,19 @@
 "flatfox:86550940",
 "flatfox:86551125",
 "flatfox:86551241",
-"flatfox:86551289"
+"flatfox:86551289",
+"flatfox:86551735",
+"flatfox:86552375",
+"flatfox:86552394",
+"flatfox:86552409",
+"flatfox:86552420",
+"flatfox:86552526",
+"flatfox:86552852",
+"flatfox:86552870",
+"flatfox:86553077",
+"flatfox:86553486",
+"flatfox:86553537",
+"flatfox:86553752"
 ]
 }
 }
